@@ -1,0 +1,24 @@
+# Secrets
+api/config.php
+
+# Claude Code
+.claude/
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Dependencies
+node_modules/
+vendor/
+
+# Logs
+*.log

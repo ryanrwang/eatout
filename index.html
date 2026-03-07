@@ -4,9 +4,132 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Eatout</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; overflow: hidden; }
+        #map { width: 100vw; height: 100vh; }
+
+        .radius-control {
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            display: flex;
+            overflow: hidden;
+        }
+        .radius-btn {
+            border: none;
+            background: white;
+            padding: 6px 12px;
+            font-size: 13px;
+            cursor: pointer;
+            border-right: 1px solid #ddd;
+            color: #333;
+        }
+        .radius-btn:last-child { border-right: none; }
+        .radius-btn:hover { background: #f0f0f0; }
+        .radius-btn.active {
+            background: #2563eb;
+            color: white;
+        }
+    </style>
 </head>
 <body>
-    <h1>Eatout</h1>
-    <p>Restaurant finder — coming soon.</p>
+    <div id="map"></div>
+    <script>
+        // State
+        let currentMarker = null;
+        let currentCircle = null;
+        let selectedRadius = 1000;
+        let pinLat = null;
+        let pinLng = null;
+
+        // Map init
+        const map = L.map('map').setView([43.6532, -79.3832], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Radius control
+        const RadiusControl = L.Control.extend({
+            options: { position: 'topright' },
+            onAdd: function () {
+                const container = L.DomUtil.create('div', 'radius-control');
+                const presets = [
+                    { label: '500m', value: 500 },
+                    { label: '1km', value: 1000 },
+                    { label: '2km', value: 2000 },
+                    { label: '5km', value: 5000 }
+                ];
+                presets.forEach(p => {
+                    const btn = L.DomUtil.create('button', 'radius-btn', container);
+                    btn.textContent = p.label;
+                    btn.dataset.value = p.value;
+                    if (p.value === selectedRadius) btn.classList.add('active');
+                    L.DomEvent.disableClickPropagation(btn);
+                    L.DomEvent.on(btn, 'click', function () {
+                        selectedRadius = p.value;
+                        container.querySelectorAll('.radius-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        if (currentCircle) {
+                            currentCircle.setRadius(selectedRadius);
+                        }
+                    });
+                });
+                return container;
+            }
+        });
+        new RadiusControl().addTo(map);
+
+        // Place or move pin
+        function placePin(lat, lng) {
+            if (currentMarker) {
+                map.removeLayer(currentMarker);
+                map.removeLayer(currentCircle);
+            }
+            pinLat = lat;
+            pinLng = lng;
+
+            currentCircle = L.circle([lat, lng], {
+                radius: selectedRadius,
+                color: '#3b82f6',
+                fillColor: '#3b82f6',
+                fillOpacity: 0.15,
+                weight: 2
+            }).addTo(map);
+
+            currentMarker = L.marker([lat, lng], { draggable: true }).addTo(map);
+            currentMarker.on('dragend', function (e) {
+                const pos = e.target.getLatLng();
+                updatePin(pos.lat, pos.lng);
+            });
+
+            console.log('Pin placed:', { lat, lng, radius: selectedRadius });
+        }
+
+        // Update pin position (on drag)
+        function updatePin(lat, lng) {
+            pinLat = lat;
+            pinLng = lng;
+            currentCircle.setLatLng([lat, lng]);
+            console.log('Pin moved:', { lat, lng, radius: selectedRadius });
+        }
+
+        // Click to place pin
+        map.on('click', function (e) {
+            placePin(e.latlng.lat, e.latlng.lng);
+        });
+
+        // Geolocation
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function (pos) {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                map.setView([lat, lng], 13);
+                placePin(lat, lng);
+            });
+        }
+    </script>
 </body>
 </html>

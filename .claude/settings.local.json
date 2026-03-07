@@ -19,7 +19,8 @@
       "Bash(\"/c/Program Files/GitHub:*)",
       "Bash(gh *)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:developers.google.com)"
+      "WebFetch(domain:developers.google.com)",
+      "mcp__Claude_Preview__preview_start"
     ]
   }
 }

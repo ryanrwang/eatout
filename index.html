@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Find restaurants near you on a map. Search by cuisine, price, and more.">
     <title>Eatout</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232563eb'%3E%3Cpath d='M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z'/%3E%3C/svg%3E">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -20,7 +22,9 @@
             flex-wrap: wrap;
             align-items: center;
             gap: 8px;
-            z-index: 1000;
+            z-index: 2000;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            position: relative;
         }
         #filter-bar label {
             font-size: 13px;
@@ -37,6 +41,34 @@
             background: #fff;
         }
         #filter-bar input[type="number"] { width: 50px; }
+
+        /* Filter controls wrapper */
+        #filter-controls { display: contents; }
+
+        /* Mobile filters button (hidden on desktop) */
+        #mobile-filters-btn {
+            display: none;
+            align-items: center;
+            gap: 4px;
+            font-size: 13px;
+            padding: 5px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            background: #fff;
+            cursor: pointer;
+            color: #333;
+        }
+        #mobile-filters-btn:hover { background: #f9fafb; }
+        .mobile-filter-badge {
+            display: inline-block;
+            background: #2563eb;
+            color: #fff;
+            border-radius: 10px;
+            font-size: 11px;
+            padding: 0 6px;
+            line-height: 18px;
+            margin-left: 4px;
+        }
 
         /* Cuisine dropdown */
         .cuisine-wrapper { position: relative; }
@@ -61,7 +93,6 @@
             line-height: 18px;
         }
         .cuisine-dropdown {
-            display: none;
             position: absolute;
             top: 100%;
             left: 0;
@@ -77,8 +108,19 @@
             z-index: 2000;
             columns: 2;
             column-gap: 4px;
+            visibility: hidden;
+            opacity: 0;
+            transform: scaleY(0.95);
+            transform-origin: top left;
+            pointer-events: none;
+            transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
         }
-        .cuisine-dropdown.open { display: block; }
+        .cuisine-dropdown.open {
+            visibility: visible;
+            opacity: 1;
+            transform: scaleY(1);
+            pointer-events: auto;
+        }
         .cuisine-dropdown label {
             display: flex;
             align-items: center;
@@ -252,6 +294,7 @@
             display: none;
             flex-direction: column;
             z-index: 500;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.08);
         }
 
         /* Panel toggle button */
@@ -543,59 +586,183 @@
             border-color: #f59e0b;
         }
 
-        /* Mobile: panel overlays map at full width */
+        /* Bottom sheet handle (visible on mobile only) */
+        #bottom-sheet-handle {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            padding: 8px 10px 4px;
+            cursor: grab;
+            flex-shrink: 0;
+        }
+        .bs-handle-bar {
+            width: 36px;
+            height: 4px;
+            background: #d1d5db;
+            border-radius: 2px;
+        }
+        .bs-count {
+            font-size: 13px;
+            color: #555;
+            margin-top: 4px;
+        }
+
+        /* Skeleton loading cards */
+        @keyframes shimmer {
+            0% { background-position: -200px 0; }
+            100% { background-position: 200px 0; }
+        }
+        .skeleton-card {
+            padding: 14px 16px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .skeleton-line {
+            height: 14px;
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 400px 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+        .skeleton-line.title { width: 65%; height: 16px; }
+        .skeleton-line.rating { width: 40%; }
+        .skeleton-line.tags { width: 80%; }
+
+        /* Initial empty state */
+        .panel-empty-initial {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #aaa;
+            font-size: 14px;
+            padding: 40px 20px;
+            text-align: center;
+            gap: 12px;
+        }
+
+        /* Focus styles */
+        .price-btn:focus-visible,
+        .cuisine-btn:focus-visible,
+        .radius-btn:focus-visible,
+        .card-number:focus-visible,
+        .card-map-btn:focus-visible,
+        .result-card:focus-visible,
+        #search-btn:focus-visible,
+        #debug-btn:focus-visible,
+        #mobile-filters-btn:focus-visible {
+            outline: 2px solid #2563eb;
+            outline-offset: 2px;
+        }
+
+        /* Pin instruction overlay */
+        #pin-instruction {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.7);
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 400;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+        #pin-instruction.hidden { opacity: 0; }
+
+        /* Mobile: bottom sheet + filter dropdown */
         @media (max-width: 767px) {
             #results-panel {
-                position: absolute;
-                top: 0;
+                position: fixed;
+                top: auto;
                 left: 0;
+                right: 0;
+                bottom: 0;
                 width: 100%;
                 min-width: 100%;
-                height: 100%;
-                z-index: 550;
+                height: 85vh;
+                z-index: 700;
+                border-right: none;
+                border-radius: 12px 12px 0 0;
+                box-shadow: 0 -2px 10px rgba(0,0,0,0.15);
+                overflow: hidden;
             }
-            #panel-toggle.panel-open {
-                left: auto;
-                top: 8px;
-                right: 8px;
-                transform: none;
-                border-radius: 6px;
-                border: 1px solid #e5e7eb;
-                z-index: 600;
+            .result-cards {
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            #panel-toggle {
+                display: none !important;
+            }
+            #bottom-sheet-handle {
+                display: flex;
+            }
+            #mobile-filters-btn {
+                display: inline-flex;
+            }
+            #filter-controls {
+                display: none;
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background: #fff;
+                padding: 12px 16px;
+                border-bottom: 1px solid #e5e7eb;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                z-index: 1500;
+                flex-direction: column;
+                gap: 12px;
+            }
+            #filter-controls.mobile-open {
+                display: flex;
+            }
+            #filter-controls .price-group {
+                justify-content: flex-start;
             }
         }
     </style>
 </head>
 <body>
     <div id="filter-bar">
-        <div class="cuisine-wrapper">
-            <button type="button" class="cuisine-btn" id="cuisine-toggle">Cuisine</button>
-            <div class="cuisine-dropdown" id="cuisine-dropdown"></div>
+        <button type="button" id="mobile-filters-btn">Filters</button>
+        <div id="filter-controls">
+            <div class="cuisine-wrapper">
+                <button type="button" class="cuisine-btn" id="cuisine-toggle">Cuisine</button>
+                <div class="cuisine-dropdown" id="cuisine-dropdown"></div>
+            </div>
+            <div class="price-group">
+                <button type="button" class="price-btn" data-value="1">$</button>
+                <button type="button" class="price-btn" data-value="2">$$</button>
+                <button type="button" class="price-btn" data-value="3">$$$</button>
+                <button type="button" class="price-btn" data-value="4">$$$$</button>
+            </div>
+            <input type="date" id="filter-date">
+            <input type="time" id="filter-time">
+            <label>Sort
+                <select id="filter-sort">
+                    <option value="best_match">Best Match</option>
+                    <option value="rating">Rating</option>
+                    <option value="review_count">Review Count</option>
+                    <option value="distance">Distance</option>
+                </select>
+            </label>
+            <label>Party
+                <input type="number" id="filter-party" min="1" max="6" value="1">
+            </label>
         </div>
-        <div class="price-group">
-            <button type="button" class="price-btn" data-value="1">$</button>
-            <button type="button" class="price-btn" data-value="2">$$</button>
-            <button type="button" class="price-btn" data-value="3">$$$</button>
-            <button type="button" class="price-btn" data-value="4">$$$$</button>
-        </div>
-        <input type="date" id="filter-date">
-        <input type="time" id="filter-time">
-        <label>Sort
-            <select id="filter-sort">
-                <option value="best_match">Best Match</option>
-                <option value="rating">Rating</option>
-                <option value="review_count">Review Count</option>
-                <option value="distance">Distance</option>
-            </select>
-        </label>
-        <label>Party
-            <input type="number" id="filter-party" min="1" max="6" value="1">
-        </label>
         <button type="button" id="search-btn" disabled>Drop a pin to search</button>
         <button type="button" id="debug-btn" title="Use mock data instead of real API">Debug</button>
     </div>
     <div id="main-content">
         <div id="results-panel">
+            <div id="bottom-sheet-handle">
+                <div class="bs-handle-bar"></div>
+                <div class="bs-count" id="bs-count"></div>
+            </div>
             <div class="result-cards" id="result-cards"></div>
             <div class="panel-attribution" id="panel-attribution" style="display:none;">Powered by Google</div>
         </div>
@@ -620,6 +787,8 @@
         let detailsCache = {};
         let expandedCardIndex = -1;
         let debugMode = localStorage.getItem('eatout_debug') === '1';
+        let bottomSheetState = 'hidden';
+        const isTouch = ('ontouchstart' in window) || window.matchMedia('(pointer: coarse)').matches;
 
         // Mock data for debug mode
         const MOCK_RESULTS = [
@@ -783,7 +952,11 @@
             const cb = document.createElement('input');
             cb.type = 'checkbox';
             cb.value = c.value;
-            cb.addEventListener('change', updateCuisineBadge);
+            cb.addEventListener('change', function() {
+                updateCuisineBadge();
+                saveFiltersToSession();
+                updateMobileFilterBadge();
+            });
             lbl.appendChild(cb);
             lbl.appendChild(document.createTextNode(c.label));
             cuisineDropdown.appendChild(lbl);
@@ -802,10 +975,74 @@
             }
         }
 
+        // Filter persistence (sessionStorage)
+        function saveFiltersToSession() {
+            var cuisines = Array.from(cuisineDropdown.querySelectorAll('input:checked')).map(function(cb) { return cb.value; });
+            var prices = Array.from(document.querySelectorAll('.price-btn.active')).map(function(b) { return parseInt(b.dataset.value); });
+            var sort = document.getElementById('filter-sort').value;
+            var date = document.getElementById('filter-date').value;
+            var time = document.getElementById('filter-time').value;
+            var party = parseInt(document.getElementById('filter-party').value) || 1;
+            sessionStorage.setItem('eatout_filters', JSON.stringify({
+                cuisines: cuisines, prices: prices, sort: sort, date: date, time: time, party: party
+            }));
+        }
+
+        function restoreFiltersFromSession() {
+            var saved = sessionStorage.getItem('eatout_filters');
+            if (!saved) return;
+            try {
+                var f = JSON.parse(saved);
+                if (f.cuisines && f.cuisines.length) {
+                    cuisineDropdown.querySelectorAll('input').forEach(function(cb) {
+                        cb.checked = f.cuisines.indexOf(cb.value) !== -1;
+                    });
+                    updateCuisineBadge();
+                }
+                if (f.prices && f.prices.length) {
+                    document.querySelectorAll('.price-btn').forEach(function(b) {
+                        b.classList.toggle('active', f.prices.indexOf(parseInt(b.dataset.value)) !== -1);
+                    });
+                }
+                if (f.sort) document.getElementById('filter-sort').value = f.sort;
+                if (f.date) document.getElementById('filter-date').value = f.date;
+                if (f.time) document.getElementById('filter-time').value = f.time;
+                if (f.party) document.getElementById('filter-party').value = f.party;
+            } catch (e) {}
+        }
+
+        // Mobile filter badge
+        function getActiveFilterCount() {
+            var count = 0;
+            count += cuisineDropdown.querySelectorAll('input:checked').length;
+            count += document.querySelectorAll('.price-btn.active').length;
+            if (document.getElementById('filter-sort').value !== 'best_match') count++;
+            if (document.getElementById('filter-party').value !== '1') count++;
+            return count;
+        }
+
+        function updateMobileFilterBadge() {
+            var btn = document.getElementById('mobile-filters-btn');
+            var existing = btn.querySelector('.mobile-filter-badge');
+            if (existing) existing.remove();
+            var count = getActiveFilterCount();
+            if (count > 0) {
+                var badge = document.createElement('span');
+                badge.className = 'mobile-filter-badge';
+                badge.textContent = count;
+                btn.appendChild(badge);
+            }
+        }
+
         // Cuisine dropdown toggle
         document.getElementById('cuisine-toggle').addEventListener('click', function (e) {
             e.stopPropagation();
             cuisineDropdown.classList.toggle('open');
+            // Focus first checkbox when opening
+            if (cuisineDropdown.classList.contains('open')) {
+                var first = cuisineDropdown.querySelector('input[type="checkbox"]');
+                if (first) first.focus();
+            }
         });
         document.addEventListener('click', function (e) {
             if (!e.target.closest('.cuisine-wrapper')) {
@@ -814,23 +1051,53 @@
         });
 
         // Price buttons
-        document.querySelectorAll('.price-btn').forEach(btn => {
+        document.querySelectorAll('.price-btn').forEach(function(btn) {
             btn.addEventListener('click', function () {
                 btn.classList.toggle('active');
+                saveFiltersToSession();
+                updateMobileFilterBadge();
             });
         });
 
         // Set default date/time to now
         (function () {
-            const now = new Date();
-            const yyyy = now.getFullYear();
-            const mm = String(now.getMonth() + 1).padStart(2, '0');
-            const dd = String(now.getDate()).padStart(2, '0');
+            var now = new Date();
+            var yyyy = now.getFullYear();
+            var mm = String(now.getMonth() + 1).padStart(2, '0');
+            var dd = String(now.getDate()).padStart(2, '0');
             document.getElementById('filter-date').value = yyyy + '-' + mm + '-' + dd;
-            const hh = String(now.getHours()).padStart(2, '0');
-            const mi = String(now.getMinutes()).padStart(2, '0');
+            var hh = String(now.getHours()).padStart(2, '0');
+            var mi = String(now.getMinutes()).padStart(2, '0');
             document.getElementById('filter-time').value = hh + ':' + mi;
         })();
+
+        // Restore filters from session (overrides defaults if saved)
+        restoreFiltersFromSession();
+        updateMobileFilterBadge();
+
+        // Filter change handlers for persistence
+        document.getElementById('filter-sort').addEventListener('change', function() {
+            saveFiltersToSession();
+            updateMobileFilterBadge();
+        });
+        document.getElementById('filter-date').addEventListener('change', saveFiltersToSession);
+        document.getElementById('filter-time').addEventListener('change', saveFiltersToSession);
+        document.getElementById('filter-party').addEventListener('change', function() {
+            saveFiltersToSession();
+            updateMobileFilterBadge();
+        });
+
+        // Mobile filters button
+        document.getElementById('mobile-filters-btn').addEventListener('click', function(e) {
+            e.stopPropagation();
+            document.getElementById('filter-controls').classList.toggle('mobile-open');
+        });
+        // Close mobile filters on outside click
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('#filter-bar')) {
+                document.getElementById('filter-controls').classList.remove('mobile-open');
+            }
+        });
 
         // Notification system
         let notificationTimer = null;
@@ -858,7 +1125,30 @@
             }
         }
 
-        // Clear result markers and panel
+        // Helper: is mobile viewport
+        function isMobile() {
+            return window.innerWidth < 768;
+        }
+
+        // URL hash state
+        function updateUrlHash() {
+            if (pinLat === null) return;
+            var hash = '#lat=' + pinLat.toFixed(6) + '&lng=' + pinLng.toFixed(6) + '&r=' + selectedRadius;
+            history.replaceState(null, '', hash);
+        }
+
+        function readUrlHash() {
+            var hash = location.hash.substring(1);
+            if (!hash) return null;
+            var params = new URLSearchParams(hash);
+            var lat = parseFloat(params.get('lat'));
+            var lng = parseFloat(params.get('lng'));
+            var r = parseInt(params.get('r'));
+            if (isNaN(lat) || isNaN(lng)) return null;
+            return { lat: lat, lng: lng, r: isNaN(r) ? 1000 : r };
+        }
+
+        // Clear result markers (without hiding panel)
         function clearResultMarkers() {
             resultMarkers.forEach(m => map.removeLayer(m));
             resultMarkers = [];
@@ -868,7 +1158,6 @@
             detailsCache = {};
             document.getElementById('result-cards').innerHTML = '';
             document.getElementById('panel-attribution').style.display = 'none';
-            if (panelOpen) hideResultsPanel();
         }
 
         // Build cuisine label lookup
@@ -886,19 +1175,63 @@
             return (d / 1000).toFixed(1) + 'km';
         }
 
-        // Panel show/hide with slide animation
-        function panelSlideOffset() {
-            return window.innerWidth < 768 ? -window.innerWidth : -380;
+        // Bottom sheet helpers
+        function setBottomSheetTransform(animate) {
+            var panel = document.getElementById('results-panel');
+            panel.style.transition = animate !== false ? 'transform 0.3s ease' : 'none';
+            switch (bottomSheetState) {
+                case 'collapsed':
+                    panel.style.transform = 'translateY(calc(85vh - 48px))';
+                    break;
+                case 'half':
+                    panel.style.transform = 'translateY(35vh)';
+                    break;
+                case 'full':
+                    panel.style.transform = 'translateY(0)';
+                    break;
+                default:
+                    panel.style.transform = 'translateY(100vh)';
+                    break;
+            }
         }
 
+        function updateBottomSheetCount() {
+            var el = document.getElementById('bs-count');
+            if (!el) return;
+            var n = searchResults.length;
+            el.textContent = n + (n === 1 ? ' restaurant' : ' restaurants');
+        }
+
+        // Panel show/hide with slide animation
         function showResultsPanel() {
             var panel = document.getElementById('results-panel');
             var toggle = document.getElementById('panel-toggle');
+
+            if (isMobile()) {
+                if (panelOpen) {
+                    updateBottomSheetCount();
+                    return;
+                }
+                panel.style.display = 'flex';
+                panel.style.marginLeft = '0';
+                bottomSheetState = 'collapsed';
+                setBottomSheetTransform(false);
+                requestAnimationFrame(function() {
+                    panel.style.transition = 'transform 0.3s ease';
+                });
+                panelOpen = true;
+                updateBottomSheetCount();
+                return;
+            }
+
+            // Desktop behavior
+            if (panelOpen) return;
+
             if (panel.style.display !== 'flex') {
                 panel.style.transition = 'none';
                 panel.style.display = 'flex';
-                panel.style.marginLeft = panelSlideOffset() + 'px';
-                panel.offsetHeight; // reflow to register starting position
+                panel.style.marginLeft = '-380px';
+                panel.offsetHeight;
             }
             panel.style.transition = 'margin-left 0.3s ease';
             panel.style.marginLeft = '0px';
@@ -913,8 +1246,21 @@
         function hideResultsPanel() {
             var panel = document.getElementById('results-panel');
             var toggle = document.getElementById('panel-toggle');
+
+            if (isMobile()) {
+                panel.style.transition = 'transform 0.3s ease';
+                panel.style.transform = 'translateY(100vh)';
+                bottomSheetState = 'hidden';
+                panelOpen = false;
+                setTimeout(function() {
+                    if (!panelOpen) panel.style.display = 'none';
+                }, 320);
+                return;
+            }
+
+            // Desktop behavior
             panel.style.transition = 'margin-left 0.3s ease';
-            panel.style.marginLeft = panelSlideOffset() + 'px';
+            panel.style.marginLeft = '-380px';
             panel.classList.remove('visible');
             toggle.classList.remove('panel-open');
             toggle.innerHTML = '&#x276F;';
@@ -962,7 +1308,7 @@
             if (!card) return;
             card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             card.classList.remove('flash');
-            card.offsetHeight; // reflow
+            card.offsetHeight;
             card.classList.add('flash');
         }
 
@@ -995,19 +1341,19 @@
             const r = searchResults[index];
             let html = '';
 
-            // Photos
+            // Photos with meaningful alt text
             if (details.photos && details.photos.length > 0) {
                 html += '<div class="detail-photos">';
                 details.photos.slice(0, 3).forEach(p => {
                     const src = 'api/photo.php?name=' + encodeURIComponent(p.name) + '&maxwidth=300';
-                    html += '<img src="' + escapeHtml(src) + '" alt="Photo" onerror="this.style.display=\'none\'">';
+                    html += '<img src="' + escapeHtml(src) + '" alt="Photo of ' + escapeHtml(r.name) + '" onerror="this.style.display=\'none\'">';
                 });
                 html += '</div>';
             }
 
             // Hours
             if (details.hours && details.hours.length > 0) {
-                const today = new Date().getDay(); // 0=Sunday
+                const today = new Date().getDay();
                 const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
                 const todayName = dayNames[today];
                 html += '<div class="detail-hours"><div class="detail-hours-title">Hours</div>';
@@ -1015,7 +1361,7 @@
                     const isToday = h.day === todayName;
                     html += '<div class="detail-hours-row' + (isToday ? ' today' : '') + '">';
                     html += '<span class="detail-hours-day">' + escapeHtml(h.day) + '</span>';
-                    html += '<span>' + escapeHtml(h.open) + ' – ' + escapeHtml(h.close) + '</span>';
+                    html += '<span>' + escapeHtml(h.open) + ' \u2013 ' + escapeHtml(h.close) + '</span>';
                     html += '</div>';
                 });
                 html += '</div>';
@@ -1068,13 +1414,11 @@
 
         // Toggle card expansion
         async function toggleCardExpansion(index) {
-            // If clicking the already expanded card, collapse it
             if (expandedCardIndex === index) {
                 collapseExpandedCard();
                 return;
             }
 
-            // Collapse previously expanded card
             collapseExpandedCard();
 
             const card = document.querySelector('.result-card[data-index="' + index + '"]');
@@ -1090,16 +1434,13 @@
             expandedCardIndex = index;
             const r = searchResults[index];
 
-            // Check cache
             if (detailsCache[r.source_id]) {
                 detail.innerHTML = '<div class="card-detail-inner">' + renderCardDetails(index, detailsCache[r.source_id]) + '</div>';
-                // Force reflow before adding class for transition
                 detail.offsetHeight;
                 detail.classList.add('open');
                 return;
             }
 
-            // Show spinner
             detail.innerHTML = '<div class="detail-spinner"><span class="spinner"></span></div>';
             detail.offsetHeight;
             detail.classList.add('open');
@@ -1108,7 +1449,6 @@
                 const data = await fetchDetails(r.source_id);
                 detailsCache[r.source_id] = data;
 
-                // Increment API counter for detail fetch
                 apiCallCount++;
                 localStorage.setItem('eatout_api_calls', String(apiCallCount));
                 updateApiCounter();
@@ -1117,7 +1457,6 @@
                     showNotification('API usage is high (' + apiCallCount + ' calls). Consider limiting searches.', 'info');
                 }
 
-                // Only render if this card is still expanded
                 if (expandedCardIndex === index) {
                     detail.innerHTML = '<div class="card-detail-inner">' + renderCardDetails(index, data) + '</div>';
                 }
@@ -1126,6 +1465,30 @@
                     detail.innerHTML = '<div class="card-detail-inner"><div class="detail-error">Could not load details</div></div>';
                 }
             }
+        }
+
+        // Skeleton loading cards
+        function showSkeletonCards() {
+            var container = document.getElementById('result-cards');
+            var html = '';
+            for (var i = 0; i < 4; i++) {
+                html += '<div class="skeleton-card">';
+                html += '<div class="skeleton-line title"></div>';
+                html += '<div class="skeleton-line rating"></div>';
+                html += '<div class="skeleton-line tags"></div>';
+                html += '</div>';
+            }
+            container.innerHTML = html;
+            document.getElementById('panel-attribution').style.display = 'none';
+        }
+
+        // Initial empty state
+        function showInitialEmptyState() {
+            var container = document.getElementById('result-cards');
+            container.innerHTML = '<div class="panel-empty-initial">' +
+                '<svg width="36" height="36" viewBox="0 0 24 24" fill="#d1d5db"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>' +
+                '<div>Drop a pin and search to find restaurants</div>' +
+                '</div>';
         }
 
         // Render result cards
@@ -1144,6 +1507,7 @@
                 const card = document.createElement('div');
                 card.className = 'result-card';
                 card.dataset.index = i;
+                card.setAttribute('tabindex', '0');
 
                 const stars = '\u2605'.repeat(Math.round(r.rating || 0));
                 const price = r.price_level ? '$'.repeat(r.price_level) : '';
@@ -1179,14 +1543,22 @@
                 card.addEventListener('mouseenter', () => highlightMarker(i));
                 card.addEventListener('mouseleave', () => unhighlightMarker(i));
 
-                // Card click → toggle expansion
+                // Card click -> toggle expansion
                 card.addEventListener('click', (e) => {
-                    // Don't expand if clicking a link, map button, or inside expanded detail
                     if (e.target.closest('a') || e.target.closest('.card-map-btn') || e.target.closest('.card-map-trigger') || e.target.closest('.card-detail-inner')) return;
                     toggleCardExpansion(i);
                 });
 
-                // Map button and number badge → pan to marker
+                // Keyboard: Enter/Space to expand card
+                card.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        if (e.target.closest('a') || e.target.closest('.card-map-btn') || e.target.closest('.card-map-trigger')) return;
+                        e.preventDefault();
+                        toggleCardExpansion(i);
+                    }
+                });
+
+                // Map button and number badge -> pan to marker
                 const mapBtn = card.querySelector('.card-map-btn');
                 const mapTrigger = card.querySelector('.card-map-trigger');
                 const showOnMap = () => {
@@ -1212,7 +1584,8 @@
             if (results.length === 0) {
                 showNotification('No restaurants found in this area.', 'info');
                 renderResultCards([]);
-                showResultsPanel();
+                if (!panelOpen) showResultsPanel();
+                if (isMobile()) updateBottomSheetCount();
                 return;
             }
 
@@ -1239,7 +1612,6 @@
                 html += '</div>';
                 marker.bindPopup(html);
 
-                // Marker click → scroll to card
                 marker.on('click', () => {
                     if (panelOpen) scrollToCard(i);
                     else {
@@ -1252,7 +1624,8 @@
             });
 
             renderResultCards(results);
-            showResultsPanel();
+            if (!panelOpen) showResultsPanel();
+            if (isMobile()) updateBottomSheetCount();
         }
 
         function escapeHtml(str) {
@@ -1268,10 +1641,16 @@
             isSearching = true;
             updateSearchButtonState();
 
+            // Close mobile filter panel
+            document.getElementById('filter-controls').classList.remove('mobile-open');
+
+            // Show skeleton loading
+            showSkeletonCards();
+            if (!panelOpen) showResultsPanel();
+
             // Debug mode: use mock data
             if (debugMode) {
                 await new Promise(r => setTimeout(r, 400 + Math.random() * 300));
-                // Scatter mock results around the pin location
                 const results = MOCK_RESULTS.map((r, i) => ({
                     ...r,
                     latitude: pinLat + (r.latitude - 43.6532) * 0.5,
@@ -1297,15 +1676,12 @@
             params.set('sort_by', document.getElementById('filter-sort').value);
             params.set('limit', '5');
 
-            // Categories
             const selectedCuisines = Array.from(cuisineDropdown.querySelectorAll('input:checked')).map(cb => cb.value);
             if (selectedCuisines.length > 0) params.set('categories', selectedCuisines.join(','));
 
-            // Price
             const selectedPrices = Array.from(document.querySelectorAll('.price-btn.active')).map(b => b.dataset.value);
             if (selectedPrices.length > 0) params.set('price', selectedPrices.join(','));
 
-            // Open at
             const dateVal = document.getElementById('filter-date').value;
             const timeVal = document.getElementById('filter-time').value;
             if (dateVal && timeVal) {
@@ -1342,7 +1718,7 @@
             debugMode = !debugMode;
             localStorage.setItem('eatout_debug', debugMode ? '1' : '0');
             updateDebugBtn();
-            showNotification(debugMode ? 'Debug mode ON — search uses mock data' : 'Debug mode OFF — search uses real API', 'info');
+            showNotification(debugMode ? 'Debug mode ON \u2014 search uses mock data' : 'Debug mode OFF \u2014 search uses real API', 'info');
         });
 
         // Map init
@@ -1350,6 +1726,9 @@
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
+
+        // Re-enable double-click zoom (pin placement uses single click)
+        map.doubleClickZoom.enable();
 
         // Window resize safety
         window.addEventListener('resize', function () { map.invalidateSize(); });
@@ -1378,6 +1757,7 @@
                         if (currentCircle) {
                             currentCircle.setRadius(selectedRadius);
                         }
+                        updateUrlHash();
                     });
                 });
                 return container;
@@ -1386,6 +1766,8 @@
         new RadiusControl().addTo(map);
 
         // Place or move pin
+        let pinInstructionDismissed = false;
+
         function placePin(lat, lng) {
             if (currentMarker) {
                 map.removeLayer(currentMarker);
@@ -1408,8 +1790,18 @@
                 updatePin(pos.lat, pos.lng);
             });
 
-            console.log('Pin placed:', { lat, lng, radius: selectedRadius });
             updateSearchButtonState();
+            updateUrlHash();
+
+            // Dismiss instruction overlay
+            if (!pinInstructionDismissed) {
+                pinInstructionDismissed = true;
+                var instruction = document.getElementById('pin-instruction');
+                if (instruction) {
+                    instruction.classList.add('hidden');
+                    setTimeout(function() { instruction.remove(); }, 500);
+                }
+            }
         }
 
         // Update pin position (on drag)
@@ -1417,23 +1809,147 @@
             pinLat = lat;
             pinLng = lng;
             currentCircle.setLatLng([lat, lng]);
-            console.log('Pin moved:', { lat, lng, radius: selectedRadius });
             updateSearchButtonState();
+            updateUrlHash();
         }
 
-        // Click to place pin
+        // Pin placement: single click/tap
         map.on('click', function (e) {
             placePin(e.latlng.lat, e.latlng.lng);
         });
 
-        // Geolocation
-        if (navigator.geolocation) {
+        // Pin instruction overlay
+        var pinInstruction = document.createElement('div');
+        pinInstruction.id = 'pin-instruction';
+        pinInstruction.textContent = isTouch ? 'Tap to drop a pin' : 'Click to drop a pin';
+        document.getElementById('map').appendChild(pinInstruction);
+
+        // Read URL hash or fall back to geolocation
+        var hashState = readUrlHash();
+        if (hashState) {
+            selectedRadius = hashState.r;
+            // Update radius button UI
+            document.querySelectorAll('.radius-btn').forEach(function(b) {
+                b.classList.toggle('active', parseInt(b.dataset.value) === selectedRadius);
+            });
+            map.setView([hashState.lat, hashState.lng], 13);
+            placePin(hashState.lat, hashState.lng);
+        } else if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(function (pos) {
-                const lat = pos.coords.latitude;
-                const lng = pos.coords.longitude;
+                var lat = pos.coords.latitude;
+                var lng = pos.coords.longitude;
                 map.setView([lat, lng], 13);
                 placePin(lat, lng);
             });
+        }
+
+        // Bottom sheet touch handling
+        (function() {
+            var handle = document.getElementById('bottom-sheet-handle');
+            var panel = document.getElementById('results-panel');
+            var touchStartY = 0;
+            var startTranslateY = 0;
+            var dragging = false;
+
+            function getCurrentTranslateY() {
+                var h = panel.offsetHeight;
+                switch (bottomSheetState) {
+                    case 'collapsed': return h - 48;
+                    case 'half': return window.innerHeight * 0.35;
+                    case 'full': return 0;
+                    default: return h;
+                }
+            }
+
+            handle.addEventListener('touchstart', function(e) {
+                touchStartY = e.touches[0].clientY;
+                startTranslateY = getCurrentTranslateY();
+                dragging = true;
+                panel.style.transition = 'none';
+            }, { passive: true });
+
+            handle.addEventListener('touchmove', function(e) {
+                if (!dragging) return;
+                var deltaY = e.touches[0].clientY - touchStartY;
+                var newY = Math.max(0, Math.min(panel.offsetHeight - 48, startTranslateY + deltaY));
+                panel.style.transform = 'translateY(' + newY + 'px)';
+            }, { passive: true });
+
+            handle.addEventListener('touchend', function(e) {
+                if (!dragging) return;
+                dragging = false;
+                panel.style.transition = 'transform 0.3s ease';
+                var endY = e.changedTouches[0].clientY;
+                var deltaY = endY - touchStartY;
+
+                if (Math.abs(deltaY) < 10) {
+                    // Treat as tap - handled by click
+                    setBottomSheetTransform(true);
+                    return;
+                }
+
+                if (deltaY > 50) {
+                    if (bottomSheetState === 'full') bottomSheetState = 'half';
+                    else if (bottomSheetState === 'half') bottomSheetState = 'collapsed';
+                } else if (deltaY < -50) {
+                    if (bottomSheetState === 'collapsed') bottomSheetState = 'half';
+                    else if (bottomSheetState === 'half') bottomSheetState = 'full';
+                }
+                setBottomSheetTransform(true);
+            });
+
+            // Tap handle to toggle collapsed/half
+            handle.addEventListener('click', function() {
+                if (bottomSheetState === 'collapsed') bottomSheetState = 'half';
+                else bottomSheetState = 'collapsed';
+                setBottomSheetTransform(true);
+            });
+        })();
+
+        // Global keyboard handler
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                // Close cuisine dropdown first
+                if (cuisineDropdown.classList.contains('open')) {
+                    cuisineDropdown.classList.remove('open');
+                    document.getElementById('cuisine-toggle').focus();
+                    return;
+                }
+                // Close mobile filter panel
+                var filterControls = document.getElementById('filter-controls');
+                if (filterControls.classList.contains('mobile-open')) {
+                    filterControls.classList.remove('mobile-open');
+                    return;
+                }
+                // Collapse bottom sheet on mobile
+                if (isMobile() && panelOpen && bottomSheetState !== 'collapsed') {
+                    bottomSheetState = 'collapsed';
+                    setBottomSheetTransform(true);
+                    return;
+                }
+            }
+
+            // Focus trap in cuisine dropdown
+            if (e.key === 'Tab' && cuisineDropdown.classList.contains('open')) {
+                var focusable = cuisineDropdown.querySelectorAll('input[type="checkbox"]');
+                if (focusable.length === 0) return;
+                var first = focusable[0];
+                var last = focusable[focusable.length - 1];
+
+                if (e.shiftKey && document.activeElement === first) {
+                    e.preventDefault();
+                    last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                    e.preventDefault();
+                    first.focus();
+                }
+            }
+        });
+
+        // Show initial empty state on desktop
+        if (!isMobile()) {
+            showInitialEmptyState();
+            showResultsPanel();
         }
     </script>
 </body>

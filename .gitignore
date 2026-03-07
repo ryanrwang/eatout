@@ -20,5 +20,9 @@ Desktop.ini
 node_modules/
 vendor/
 
+# Cache data (keep .htaccess for directory protection)
+api/data/*
+!api/data/.htaccess
+
 # Logs
 *.log

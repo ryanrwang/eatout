@@ -311,7 +311,11 @@
             justify-content: center;
             font-size: 13px;
             font-weight: 700;
+            border: none;
+            cursor: pointer;
+            padding: 0;
         }
+        .card-number:hover { background: #b91c1c; }
         .card-title-row { flex: 1; min-width: 0; }
         .card-name {
             font-size: 15px;
@@ -398,6 +402,147 @@
             box-shadow: 0 0 0 4px rgba(37,99,235,0.4), 0 2px 4px rgba(0,0,0,0.3);
         }
 
+        /* Show on map button */
+        .card-map-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #888;
+            font-size: 16px;
+            padding: 2px 4px;
+            border-radius: 4px;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+        .card-map-btn:hover { color: #2563eb; background: #eff6ff; }
+
+        /* Expanded card detail section */
+        .card-detail {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.35s ease;
+        }
+        .card-detail.open {
+            max-height: 600px;
+        }
+        .card-detail-inner {
+            padding: 12px 0 4px;
+            border-top: 1px solid #f0f0f0;
+            margin-top: 10px;
+            background: #f9fafb;
+            border-radius: 6px;
+            padding: 12px;
+        }
+
+        /* Detail loading spinner */
+        .detail-spinner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .detail-spinner .spinner {
+            border: 2px solid rgba(37,99,235,0.2);
+            border-top-color: #2563eb;
+        }
+
+        /* Photo strip */
+        .detail-photos {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            margin-bottom: 10px;
+        }
+        .detail-photos img {
+            height: 120px;
+            width: auto;
+            border-radius: 6px;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+
+        /* Detail hours */
+        .detail-hours {
+            font-size: 12px;
+            color: #555;
+            margin-bottom: 8px;
+        }
+        .detail-hours-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 4px;
+        }
+        .detail-hours-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 2px 0;
+        }
+        .detail-hours-row.today {
+            font-weight: 600;
+            color: #2563eb;
+        }
+        .detail-hours-day { min-width: 80px; }
+
+        /* Detail links */
+        .detail-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .detail-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            text-decoration: none;
+            border: 1px solid #d1d5db;
+            color: #333;
+            background: #fff;
+        }
+        .detail-link:hover { background: #f3f4f6; }
+        .detail-link-primary {
+            background: #2563eb;
+            color: #fff;
+            border-color: #2563eb;
+        }
+        .detail-link-primary:hover { background: #1d4ed8; }
+        .detail-link-opentable {
+            background: #da3743;
+            color: #fff;
+            border-color: #da3743;
+        }
+        .detail-link-opentable:hover { background: #c22d38; }
+
+        /* Detail error */
+        .detail-error {
+            font-size: 12px;
+            color: #888;
+            padding: 12px 0;
+            text-align: center;
+        }
+
+        /* Debug toggle */
+        #debug-btn {
+            margin-left: auto;
+            font-size: 11px;
+            padding: 3px 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            background: #fff;
+            cursor: pointer;
+            color: #888;
+        }
+        #debug-btn:hover { background: #f9fafb; }
+        #debug-btn.active {
+            background: #fef3c7;
+            color: #92400e;
+            border-color: #f59e0b;
+        }
+
         /* Mobile: panel overlays map at full width */
         @media (max-width: 767px) {
             #results-panel {
@@ -447,6 +592,7 @@
             <input type="number" id="filter-party" min="1" max="6" value="1">
         </label>
         <button type="button" id="search-btn" disabled>Drop a pin to search</button>
+        <button type="button" id="debug-btn" title="Use mock data instead of real API">Debug</button>
     </div>
     <div id="main-content">
         <div id="results-panel">
@@ -471,6 +617,134 @@
         let panelOpen = false;
         let searchResults = [];
         let activeCardIndex = -1;
+        let detailsCache = {};
+        let expandedCardIndex = -1;
+        let debugMode = localStorage.getItem('eatout_debug') === '1';
+
+        // Mock data for debug mode
+        const MOCK_RESULTS = [
+            {
+                name: "Pai Northern Thai Kitchen", address: "18 Duncan St, Toronto, ON M5H 3G8",
+                latitude: 43.6495, longitude: -79.3882, rating: 4.5, price_level: 2,
+                cuisine_tags: ["thai_restaurant", "restaurant", "food"],
+                image_url: "", phone: "(416) 901-4724", source: "google",
+                source_url: "https://www.google.com/maps/place/?q=place_id:ChIJDbmGBaY0K4gRSTkwBKFSDgM",
+                source_id: "ChIJDbmGBaY0K4gRSTkwBKFSDgM", distance: 0.0,
+                review_count: 4812, transactions: [], is_closed: false
+            },
+            {
+                name: "Kinka Izakaya Original", address: "398 Church St, Toronto, ON M5B 2A2",
+                latitude: 43.6598, longitude: -79.3790, rating: 4.3, price_level: 2,
+                cuisine_tags: ["japanese_restaurant", "sushi_restaurant", "restaurant"],
+                image_url: "", phone: "(416) 977-0999", source: "google",
+                source_url: "https://www.google.com/maps/place/?q=place_id:ChIJTSRBqKc0K4gRkH1MlUKJOGE",
+                source_id: "ChIJTSRBqKc0K4gRkH1MlUKJOGE", distance: 0.0,
+                review_count: 3241, transactions: [], is_closed: false
+            },
+            {
+                name: "Richmond Station", address: "1 Richmond St W, Toronto, ON M5H 3W4",
+                latitude: 43.6512, longitude: -79.3810, rating: 4.4, price_level: 3,
+                cuisine_tags: ["restaurant", "brunch_restaurant", "cafe"],
+                image_url: "", phone: "(647) 748-1444", source: "google",
+                source_url: "https://www.google.com/maps/place/?q=place_id:ChIJm8Oc3qU0K4gRpkOXSGKTMhQ",
+                source_id: "ChIJm8Oc3qU0K4gRpkOXSGKTMhQ", distance: 0.0,
+                review_count: 1823, transactions: [], is_closed: true
+            },
+            {
+                name: "Byblos Toronto", address: "11 Duncan St, Toronto, ON M5H 3G8",
+                latitude: 43.6490, longitude: -79.3878, rating: 4.6, price_level: 4,
+                cuisine_tags: ["mediterranean_restaurant", "restaurant"],
+                image_url: "", phone: "(416) 637-7575", source: "google",
+                source_url: "https://www.google.com/maps/place/?q=place_id:ChIJY7aDzaY0K4gRQ0K1fXn5n4o",
+                source_id: "ChIJY7aDzaY0K4gRQ0K1fXn5n4o", distance: 0.0,
+                review_count: 2456, transactions: [], is_closed: false
+            },
+            {
+                name: "Sansotei Ramen", address: "179 Dundas St W, Toronto, ON M5G 1C7",
+                latitude: 43.6543, longitude: -79.3865, rating: 4.2, price_level: 1,
+                cuisine_tags: ["ramen_restaurant", "japanese_restaurant"],
+                image_url: "", phone: "(647) 748-3833", source: "google",
+                source_url: "https://www.google.com/maps/place/?q=place_id:ChIJ8xWPxqU0K4gR3S4DF9YIDQ0",
+                source_id: "ChIJ8xWPxqU0K4gR3S4DF9YIDQ0", distance: 0.0,
+                review_count: 987, transactions: [], is_closed: false
+            }
+        ];
+
+        const MOCK_DETAILS = {
+            "ChIJDbmGBaY0K4gRSTkwBKFSDgM": {
+                photos: [
+                    { name: "places/ChIJDbmGBaY0K4gRSTkwBKFSDgM/photos/AelY_Ct1a2bK", widthPx: 400, heightPx: 300 },
+                    { name: "places/ChIJDbmGBaY0K4gRSTkwBKFSDgM/photos/AelY_Ct2x9qR", widthPx: 400, heightPx: 300 },
+                    { name: "places/ChIJDbmGBaY0K4gRSTkwBKFSDgM/photos/AelY_Ct3m7nP", widthPx: 400, heightPx: 300 }
+                ],
+                hours: [
+                    { day: "Monday", open: "11:30 AM", close: "10:00 PM" },
+                    { day: "Tuesday", open: "11:30 AM", close: "10:00 PM" },
+                    { day: "Wednesday", open: "11:30 AM", close: "10:00 PM" },
+                    { day: "Thursday", open: "11:30 AM", close: "10:00 PM" },
+                    { day: "Friday", open: "11:30 AM", close: "11:00 PM" },
+                    { day: "Saturday", open: "11:00 AM", close: "11:00 PM" },
+                    { day: "Sunday", open: "11:00 AM", close: "10:00 PM" }
+                ],
+                phone: "(416) 901-4724", address: "18 Duncan St, Toronto, ON M5H 3G8",
+                website: "https://www.paitoronto.com"
+            },
+            "ChIJTSRBqKc0K4gRkH1MlUKJOGE": {
+                photos: [
+                    { name: "places/ChIJTSRBqKc0K4gRkH1MlUKJOGE/photos/AelY_DkR4wZ", widthPx: 400, heightPx: 300 }
+                ],
+                hours: [
+                    { day: "Monday", open: "5:00 PM", close: "11:00 PM" },
+                    { day: "Tuesday", open: "5:00 PM", close: "11:00 PM" },
+                    { day: "Wednesday", open: "5:00 PM", close: "11:00 PM" },
+                    { day: "Thursday", open: "5:00 PM", close: "11:00 PM" },
+                    { day: "Friday", open: "5:00 PM", close: "12:00 AM" },
+                    { day: "Saturday", open: "12:00 PM", close: "12:00 AM" },
+                    { day: "Sunday", open: "12:00 PM", close: "10:00 PM" }
+                ],
+                phone: "(416) 977-0999", address: "398 Church St, Toronto, ON M5B 2A2",
+                website: "https://www.kinkaizakaya.com"
+            },
+            "ChIJm8Oc3qU0K4gRpkOXSGKTMhQ": {
+                photos: [],
+                hours: [],
+                phone: "(647) 748-1444", address: "1 Richmond St W, Toronto, ON M5H 3W4",
+                website: "https://www.richmondstation.ca"
+            },
+            "ChIJY7aDzaY0K4gRQ0K1fXn5n4o": {
+                photos: [
+                    { name: "places/ChIJY7aDzaY0K4gRQ0K1fXn5n4o/photos/AelY_Bx8pQm", widthPx: 400, heightPx: 300 },
+                    { name: "places/ChIJY7aDzaY0K4gRQ0K1fXn5n4o/photos/AelY_Ck3rTn", widthPx: 400, heightPx: 300 }
+                ],
+                hours: [
+                    { day: "Monday", open: "5:00 PM", close: "10:00 PM" },
+                    { day: "Tuesday", open: "5:00 PM", close: "10:00 PM" },
+                    { day: "Wednesday", open: "5:00 PM", close: "10:00 PM" },
+                    { day: "Thursday", open: "5:00 PM", close: "10:00 PM" },
+                    { day: "Friday", open: "5:00 PM", close: "11:00 PM" },
+                    { day: "Saturday", open: "11:00 AM", close: "11:00 PM" },
+                    { day: "Sunday", open: "11:00 AM", close: "10:00 PM" }
+                ],
+                phone: "(416) 637-7575", address: "11 Duncan St, Toronto, ON M5H 3G8",
+                website: "https://www.byblos.com"
+            },
+            "ChIJ8xWPxqU0K4gR3S4DF9YIDQ0": {
+                photos: [
+                    { name: "places/ChIJ8xWPxqU0K4gR3S4DF9YIDQ0/photos/AelY_Fm2kLp", widthPx: 400, heightPx: 300 }
+                ],
+                hours: [
+                    { day: "Monday", open: "11:00 AM", close: "9:00 PM" },
+                    { day: "Tuesday", open: "11:00 AM", close: "9:00 PM" },
+                    { day: "Wednesday", open: "11:00 AM", close: "9:00 PM" },
+                    { day: "Thursday", open: "11:00 AM", close: "9:00 PM" },
+                    { day: "Friday", open: "11:00 AM", close: "9:30 PM" },
+                    { day: "Saturday", open: "11:00 AM", close: "9:30 PM" },
+                    { day: "Sunday", open: "11:00 AM", close: "9:00 PM" }
+                ],
+                phone: "(647) 748-3833", address: "179 Dundas St W, Toronto, ON M5G 1C7",
+                website: null
+            }
+        };
 
         // Update API counter display
         function updateApiCounter() {
@@ -590,6 +864,8 @@
             resultMarkers = [];
             searchResults = [];
             activeCardIndex = -1;
+            expandedCardIndex = -1;
+            detailsCache = {};
             document.getElementById('result-cards').innerHTML = '';
             document.getElementById('panel-attribution').style.display = 'none';
             if (panelOpen) hideResultsPanel();
@@ -690,10 +966,173 @@
             card.classList.add('flash');
         }
 
+        // Fetch place details
+        async function fetchDetails(sourceId) {
+            if (debugMode && MOCK_DETAILS[sourceId]) {
+                await new Promise(r => setTimeout(r, 300 + Math.random() * 400));
+                return MOCK_DETAILS[sourceId];
+            }
+            const resp = await fetch('api/details.php?place_id=' + encodeURIComponent(sourceId));
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.error || 'Failed to fetch details');
+            return data;
+        }
+
+        // Build OpenTable search URL
+        function buildOpenTableUrl(name) {
+            const party = document.getElementById('filter-party').value || '1';
+            const dateVal = document.getElementById('filter-date').value;
+            const timeVal = document.getElementById('filter-time').value;
+            let dateTime = '';
+            if (dateVal && timeVal) dateTime = dateVal + 'T' + timeVal;
+            let url = 'https://www.opentable.com/s?term=' + encodeURIComponent(name) + '&covers=' + party;
+            if (dateTime) url += '&dateTime=' + encodeURIComponent(dateTime);
+            return url;
+        }
+
+        // Render expanded detail HTML
+        function renderCardDetails(index, details) {
+            const r = searchResults[index];
+            let html = '';
+
+            // Photos
+            if (details.photos && details.photos.length > 0) {
+                html += '<div class="detail-photos">';
+                details.photos.slice(0, 3).forEach(p => {
+                    const src = 'api/photo.php?name=' + encodeURIComponent(p.name) + '&maxwidth=300';
+                    html += '<img src="' + escapeHtml(src) + '" alt="Photo" onerror="this.style.display=\'none\'">';
+                });
+                html += '</div>';
+            }
+
+            // Hours
+            if (details.hours && details.hours.length > 0) {
+                const today = new Date().getDay(); // 0=Sunday
+                const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+                const todayName = dayNames[today];
+                html += '<div class="detail-hours"><div class="detail-hours-title">Hours</div>';
+                details.hours.forEach(h => {
+                    const isToday = h.day === todayName;
+                    html += '<div class="detail-hours-row' + (isToday ? ' today' : '') + '">';
+                    html += '<span class="detail-hours-day">' + escapeHtml(h.day) + '</span>';
+                    html += '<span>' + escapeHtml(h.open) + ' – ' + escapeHtml(h.close) + '</span>';
+                    html += '</div>';
+                });
+                html += '</div>';
+            } else {
+                html += '<div class="detail-hours" style="color:#aaa;">Hours not available</div>';
+            }
+
+            // Links row
+            html += '<div class="detail-links">';
+
+            // Phone
+            if (details.phone || r.phone) {
+                const phone = details.phone || r.phone;
+                html += '<a class="detail-link" href="tel:' + escapeHtml(phone) + '">&#9742; ' + escapeHtml(phone) + '</a>';
+            }
+
+            // Website
+            if (details.website) {
+                let domain = details.website;
+                try { domain = new URL(details.website).hostname; } catch(e) {}
+                html += '<a class="detail-link" href="' + escapeHtml(details.website) + '" target="_blank" rel="noopener">&#127760; ' + escapeHtml(domain) + '</a>';
+            }
+
+            // Google Maps
+            html += '<a class="detail-link detail-link-primary" href="' + escapeHtml(r.source_url || '#') + '" target="_blank" rel="noopener">View on Google Maps</a>';
+
+            // OpenTable
+            html += '<a class="detail-link detail-link-opentable" href="' + escapeHtml(buildOpenTableUrl(r.name)) + '" target="_blank" rel="noopener">Find on OpenTable</a>';
+
+            html += '</div>';
+
+            // Cache indicator
+            if (details.cached) {
+                html += '<div style="text-align:right;font-size:10px;color:#aaa;margin-top:4px;">cached</div>';
+            }
+
+            return html;
+        }
+
+        // Collapse currently expanded card
+        function collapseExpandedCard() {
+            if (expandedCardIndex === -1) return;
+            const card = document.querySelector('.result-card[data-index="' + expandedCardIndex + '"]');
+            if (card) {
+                const detail = card.querySelector('.card-detail');
+                if (detail) detail.classList.remove('open');
+            }
+            expandedCardIndex = -1;
+        }
+
+        // Toggle card expansion
+        async function toggleCardExpansion(index) {
+            // If clicking the already expanded card, collapse it
+            if (expandedCardIndex === index) {
+                collapseExpandedCard();
+                return;
+            }
+
+            // Collapse previously expanded card
+            collapseExpandedCard();
+
+            const card = document.querySelector('.result-card[data-index="' + index + '"]');
+            if (!card) return;
+
+            let detail = card.querySelector('.card-detail');
+            if (!detail) {
+                detail = document.createElement('div');
+                detail.className = 'card-detail';
+                card.appendChild(detail);
+            }
+
+            expandedCardIndex = index;
+            const r = searchResults[index];
+
+            // Check cache
+            if (detailsCache[r.source_id]) {
+                detail.innerHTML = '<div class="card-detail-inner">' + renderCardDetails(index, detailsCache[r.source_id]) + '</div>';
+                // Force reflow before adding class for transition
+                detail.offsetHeight;
+                detail.classList.add('open');
+                return;
+            }
+
+            // Show spinner
+            detail.innerHTML = '<div class="detail-spinner"><span class="spinner"></span></div>';
+            detail.offsetHeight;
+            detail.classList.add('open');
+
+            try {
+                const data = await fetchDetails(r.source_id);
+                detailsCache[r.source_id] = data;
+
+                // Increment API counter for detail fetch
+                apiCallCount++;
+                localStorage.setItem('eatout_api_calls', String(apiCallCount));
+                updateApiCounter();
+
+                if (apiCallCount > 100) {
+                    showNotification('API usage is high (' + apiCallCount + ' calls). Consider limiting searches.', 'info');
+                }
+
+                // Only render if this card is still expanded
+                if (expandedCardIndex === index) {
+                    detail.innerHTML = '<div class="card-detail-inner">' + renderCardDetails(index, data) + '</div>';
+                }
+            } catch (err) {
+                if (expandedCardIndex === index) {
+                    detail.innerHTML = '<div class="card-detail-inner"><div class="detail-error">Could not load details</div></div>';
+                }
+            }
+        }
+
         // Render result cards
         function renderResultCards(results) {
             const container = document.getElementById('result-cards');
             container.innerHTML = '';
+            expandedCardIndex = -1;
 
             if (results.length === 0) {
                 container.innerHTML = '<div class="panel-empty">No restaurants found in this area.</div>';
@@ -712,7 +1151,7 @@
                 const tags = (r.cuisine_tags || []).slice(0, 3).map(t => '<span class="card-tag">' + escapeHtml(friendlyCuisine(t)) + '</span>').join('');
 
                 let html = '<div class="card-header">';
-                html += '<div class="card-number">' + (i + 1) + '</div>';
+                html += '<button type="button" class="card-number card-map-trigger" title="Show on map">' + (i + 1) + '</button>';
                 html += '<div class="card-title-row">';
                 html += '<a class="card-name" href="' + escapeHtml(r.source_url || '#') + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' + escapeHtml(r.name) + '</a>';
                 if (r.is_closed) html += '<span class="card-closed">Closed</span>';
@@ -721,7 +1160,9 @@
                     if (r.review_count) html += ' <span class="review-count">(' + r.review_count + ' reviews)</span>';
                     html += '</div>';
                 }
-                html += '</div></div>';
+                html += '</div>';
+                html += '<button type="button" class="card-map-btn" title="Show on map">&#x1F4CD;</button>';
+                html += '</div>';
 
                 html += '<div class="card-meta">';
                 if (price) html += '<span class="card-price">' + price + '</span>';
@@ -737,12 +1178,25 @@
                 // Card interactions
                 card.addEventListener('mouseenter', () => highlightMarker(i));
                 card.addEventListener('mouseleave', () => unhighlightMarker(i));
-                card.addEventListener('click', () => {
+
+                // Card click → toggle expansion
+                card.addEventListener('click', (e) => {
+                    // Don't expand if clicking a link, map button, or inside expanded detail
+                    if (e.target.closest('a') || e.target.closest('.card-map-btn') || e.target.closest('.card-map-trigger') || e.target.closest('.card-detail-inner')) return;
+                    toggleCardExpansion(i);
+                });
+
+                // Map button and number badge → pan to marker
+                const mapBtn = card.querySelector('.card-map-btn');
+                const mapTrigger = card.querySelector('.card-map-trigger');
+                const showOnMap = () => {
                     if (i < resultMarkers.length) {
                         map.panTo(resultMarkers[i].getLatLng());
                         resultMarkers[i].openPopup();
                     }
-                });
+                };
+                mapBtn.addEventListener('click', (e) => { e.stopPropagation(); showOnMap(); });
+                mapTrigger.addEventListener('click', (e) => { e.stopPropagation(); showOnMap(); });
 
                 container.appendChild(card);
             });
@@ -814,6 +1268,22 @@
             isSearching = true;
             updateSearchButtonState();
 
+            // Debug mode: use mock data
+            if (debugMode) {
+                await new Promise(r => setTimeout(r, 400 + Math.random() * 300));
+                // Scatter mock results around the pin location
+                const results = MOCK_RESULTS.map((r, i) => ({
+                    ...r,
+                    latitude: pinLat + (r.latitude - 43.6532) * 0.5,
+                    longitude: pinLng + (r.longitude - (-79.3832)) * 0.5,
+                }));
+                displayResults(results);
+                showNotification('Debug mode: showing mock data', 'info');
+                isSearching = false;
+                updateSearchButtonState();
+                return;
+            }
+
             // Increment API counter
             apiCallCount++;
             localStorage.setItem('eatout_api_calls', String(apiCallCount));
@@ -860,6 +1330,20 @@
         }
 
         document.getElementById('search-btn').addEventListener('click', performSearch);
+
+        // Debug mode toggle
+        const debugBtn = document.getElementById('debug-btn');
+        function updateDebugBtn() {
+            debugBtn.classList.toggle('active', debugMode);
+            debugBtn.textContent = debugMode ? 'Debug ON' : 'Debug';
+        }
+        updateDebugBtn();
+        debugBtn.addEventListener('click', function () {
+            debugMode = !debugMode;
+            localStorage.setItem('eatout_debug', debugMode ? '1' : '0');
+            updateDebugBtn();
+            showNotification(debugMode ? 'Debug mode ON — search uses mock data' : 'Debug mode OFF — search uses real API', 'info');
+        });
 
         // Map init
         const map = L.map('map').setView([43.6532, -79.3832], 13);

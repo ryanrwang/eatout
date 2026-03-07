@@ -8,9 +8,138 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { width: 100%; height: 100%; overflow: hidden; }
-        #map { width: 100vw; height: 100vh; }
+        html, body { width: 100%; height: 100%; display: flex; flex-direction: column; }
+        #map { flex: 1; width: 100%; }
 
+        /* Filter bar */
+        #filter-bar {
+            background: #fff;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 8px 12px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            z-index: 1000;
+        }
+        #filter-bar label {
+            font-size: 13px;
+            color: #555;
+        }
+        #filter-bar select,
+        #filter-bar input[type="date"],
+        #filter-bar input[type="time"],
+        #filter-bar input[type="number"] {
+            font-size: 13px;
+            padding: 4px 6px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            background: #fff;
+        }
+        #filter-bar input[type="number"] { width: 50px; }
+
+        /* Cuisine dropdown */
+        .cuisine-wrapper { position: relative; }
+        .cuisine-btn {
+            font-size: 13px;
+            padding: 4px 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            background: #fff;
+            cursor: pointer;
+            color: #333;
+        }
+        .cuisine-btn:hover { background: #f9fafb; }
+        .cuisine-badge {
+            display: inline-block;
+            background: #2563eb;
+            color: #fff;
+            border-radius: 10px;
+            font-size: 11px;
+            padding: 0 6px;
+            margin-left: 4px;
+            line-height: 18px;
+        }
+        .cuisine-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 4px;
+            background: #fff;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            padding: 8px;
+            width: 260px;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 2000;
+            columns: 2;
+            column-gap: 4px;
+        }
+        .cuisine-dropdown.open { display: block; }
+        .cuisine-dropdown label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 4px;
+            border-radius: 3px;
+            cursor: pointer;
+            break-inside: avoid;
+            font-size: 13px;
+        }
+        .cuisine-dropdown label:hover { background: #f3f4f6; }
+
+        /* Price toggles */
+        .price-group { display: flex; gap: 2px; }
+        .price-btn {
+            border: 1px solid #d1d5db;
+            background: #fff;
+            padding: 4px 8px;
+            font-size: 13px;
+            cursor: pointer;
+            color: #333;
+        }
+        .price-btn:first-child { border-radius: 4px 0 0 4px; }
+        .price-btn:last-child { border-radius: 0 4px 4px 0; }
+        .price-btn.active {
+            background: #2563eb;
+            color: #fff;
+            border-color: #2563eb;
+        }
+
+        /* Search button */
+        #search-btn {
+            padding: 5px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: #2563eb;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        #search-btn:hover:not(:disabled) { background: #1d4ed8; }
+        #search-btn:disabled {
+            background: #93c5fd;
+            cursor: not-allowed;
+        }
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,0.4);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Radius control */
         .radius-control {
             background: white;
             border-radius: 6px;
@@ -33,10 +162,108 @@
             background: #2563eb;
             color: white;
         }
+
+        /* Result markers */
+        .result-marker {
+            background: #dc2626;
+            color: #fff;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 700;
+            border: 2px solid #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        .result-popup h3 {
+            margin: 0 0 4px;
+            font-size: 14px;
+        }
+        .result-popup .meta {
+            font-size: 12px;
+            color: #555;
+            margin-bottom: 2px;
+        }
+        .result-popup .stars { color: #f59e0b; }
+        .result-popup a {
+            font-size: 12px;
+            color: #2563eb;
+        }
+
+        /* Notification */
+        #notification {
+            display: none;
+            position: fixed;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            z-index: 3000;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        #notification.error {
+            background: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+        #notification.info {
+            background: #eff6ff;
+            color: #1e40af;
+            border: 1px solid #bfdbfe;
+        }
+
+        /* API call counter */
+        #api-counter {
+            position: fixed;
+            bottom: 6px;
+            left: 6px;
+            background: rgba(0,0,0,0.5);
+            color: #fff;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            z-index: 1000;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
+    <div id="filter-bar">
+        <div class="cuisine-wrapper">
+            <button type="button" class="cuisine-btn" id="cuisine-toggle">Cuisine</button>
+            <div class="cuisine-dropdown" id="cuisine-dropdown"></div>
+        </div>
+        <div class="price-group">
+            <button type="button" class="price-btn" data-value="1">$</button>
+            <button type="button" class="price-btn" data-value="2">$$</button>
+            <button type="button" class="price-btn" data-value="3">$$$</button>
+            <button type="button" class="price-btn" data-value="4">$$$$</button>
+        </div>
+        <input type="date" id="filter-date">
+        <input type="time" id="filter-time">
+        <label>Sort
+            <select id="filter-sort">
+                <option value="best_match">Best Match</option>
+                <option value="rating">Rating</option>
+                <option value="review_count">Review Count</option>
+                <option value="distance">Distance</option>
+            </select>
+        </label>
+        <label>Party
+            <input type="number" id="filter-party" min="1" max="6" value="1">
+        </label>
+        <button type="button" id="search-btn" disabled>Drop a pin to search</button>
+    </div>
     <div id="map"></div>
+    <div id="notification"></div>
+    <div id="api-counter"></div>
     <script>
         // State
         let currentMarker = null;
@@ -44,12 +271,229 @@
         let selectedRadius = 1000;
         let pinLat = null;
         let pinLng = null;
+        let resultMarkers = [];
+        let isSearching = false;
+        let apiCallCount = parseInt(localStorage.getItem('eatout_api_calls') || '0', 10);
+
+        // Update API counter display
+        function updateApiCounter() {
+            document.getElementById('api-counter').textContent = 'API calls: ' + apiCallCount;
+        }
+        updateApiCounter();
+
+        // Cuisine data
+        const cuisineTypes = [
+            { value: 'japanese_restaurant', label: 'Japanese' },
+            { value: 'chinese_restaurant', label: 'Chinese' },
+            { value: 'korean_restaurant', label: 'Korean' },
+            { value: 'thai_restaurant', label: 'Thai' },
+            { value: 'vietnamese_restaurant', label: 'Vietnamese' },
+            { value: 'indian_restaurant', label: 'Indian' },
+            { value: 'italian_restaurant', label: 'Italian' },
+            { value: 'pizza_restaurant', label: 'Pizza' },
+            { value: 'mexican_restaurant', label: 'Mexican' },
+            { value: 'french_restaurant', label: 'French' },
+            { value: 'mediterranean_restaurant', label: 'Mediterranean' },
+            { value: 'hamburger_restaurant', label: 'Hamburger' },
+            { value: 'seafood_restaurant', label: 'Seafood' },
+            { value: 'sushi_restaurant', label: 'Sushi' },
+            { value: 'ramen_restaurant', label: 'Ramen' },
+            { value: 'barbecue_restaurant', label: 'Barbecue' },
+            { value: 'vegan_restaurant', label: 'Vegan' },
+            { value: 'breakfast_restaurant', label: 'Breakfast' },
+            { value: 'cafe', label: 'Cafe' },
+            { value: 'dessert_restaurant', label: 'Dessert' },
+        ];
+
+        // Build cuisine dropdown checkboxes
+        const cuisineDropdown = document.getElementById('cuisine-dropdown');
+        cuisineTypes.forEach(c => {
+            const lbl = document.createElement('label');
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.value = c.value;
+            cb.addEventListener('change', updateCuisineBadge);
+            lbl.appendChild(cb);
+            lbl.appendChild(document.createTextNode(c.label));
+            cuisineDropdown.appendChild(lbl);
+        });
+
+        function updateCuisineBadge() {
+            const count = cuisineDropdown.querySelectorAll('input:checked').length;
+            const btn = document.getElementById('cuisine-toggle');
+            const existing = btn.querySelector('.cuisine-badge');
+            if (existing) existing.remove();
+            if (count > 0) {
+                const badge = document.createElement('span');
+                badge.className = 'cuisine-badge';
+                badge.textContent = count;
+                btn.appendChild(badge);
+            }
+        }
+
+        // Cuisine dropdown toggle
+        document.getElementById('cuisine-toggle').addEventListener('click', function (e) {
+            e.stopPropagation();
+            cuisineDropdown.classList.toggle('open');
+        });
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('.cuisine-wrapper')) {
+                cuisineDropdown.classList.remove('open');
+            }
+        });
+
+        // Price buttons
+        document.querySelectorAll('.price-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                btn.classList.toggle('active');
+            });
+        });
+
+        // Set default date/time to now
+        (function () {
+            const now = new Date();
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const dd = String(now.getDate()).padStart(2, '0');
+            document.getElementById('filter-date').value = yyyy + '-' + mm + '-' + dd;
+            const hh = String(now.getHours()).padStart(2, '0');
+            const mi = String(now.getMinutes()).padStart(2, '0');
+            document.getElementById('filter-time').value = hh + ':' + mi;
+        })();
+
+        // Notification system
+        let notificationTimer = null;
+        function showNotification(message, type) {
+            const el = document.getElementById('notification');
+            el.textContent = message;
+            el.className = type;
+            el.style.display = 'block';
+            clearTimeout(notificationTimer);
+            notificationTimer = setTimeout(() => { el.style.display = 'none'; }, 5000);
+        }
+
+        // Search button state
+        function updateSearchButtonState() {
+            const btn = document.getElementById('search-btn');
+            if (isSearching) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner"></span> Searching\u2026';
+            } else if (pinLat === null) {
+                btn.disabled = true;
+                btn.textContent = 'Drop a pin to search';
+            } else {
+                btn.disabled = false;
+                btn.textContent = 'Search';
+            }
+        }
+
+        // Clear result markers
+        function clearResultMarkers() {
+            resultMarkers.forEach(m => map.removeLayer(m));
+            resultMarkers = [];
+        }
+
+        // Display results on map
+        function displayResults(results) {
+            clearResultMarkers();
+            if (results.length === 0) {
+                showNotification('No restaurants found in this area.', 'info');
+                return;
+            }
+            results.forEach((r, i) => {
+                const icon = L.divIcon({
+                    className: '',
+                    html: '<div class="result-marker">' + (i + 1) + '</div>',
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14],
+                });
+                const marker = L.marker([r.latitude, r.longitude], { icon: icon }).addTo(map);
+
+                const stars = '\u2605'.repeat(Math.round(r.rating || 0));
+                const price = '$'.repeat(r.price_level || 0);
+                let html = '<div class="result-popup">';
+                html += '<h3>' + (i + 1) + '. ' + escapeHtml(r.name) + '</h3>';
+                if (r.rating) {
+                    html += '<div class="meta"><span class="stars">' + stars + '</span> ' +
+                            r.rating + (r.review_count ? ' (' + r.review_count + ')' : '') + '</div>';
+                }
+                if (price) html += '<div class="meta">' + price + '</div>';
+                if (r.address) html += '<div class="meta">' + escapeHtml(r.address) + '</div>';
+                if (r.source_url) html += '<a href="' + escapeHtml(r.source_url) + '" target="_blank" rel="noopener">View on Google Maps</a>';
+                html += '</div>';
+                marker.bindPopup(html);
+                resultMarkers.push(marker);
+            });
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // Perform search
+        async function performSearch() {
+            if (pinLat === null || isSearching) return;
+
+            isSearching = true;
+            updateSearchButtonState();
+
+            // Increment API counter
+            apiCallCount++;
+            localStorage.setItem('eatout_api_calls', String(apiCallCount));
+            updateApiCounter();
+
+            // Build params
+            const params = new URLSearchParams();
+            params.set('latitude', pinLat);
+            params.set('longitude', pinLng);
+            params.set('radius', selectedRadius);
+            params.set('sort_by', document.getElementById('filter-sort').value);
+            params.set('limit', '5');
+
+            // Categories
+            const selectedCuisines = Array.from(cuisineDropdown.querySelectorAll('input:checked')).map(cb => cb.value);
+            if (selectedCuisines.length > 0) params.set('categories', selectedCuisines.join(','));
+
+            // Price
+            const selectedPrices = Array.from(document.querySelectorAll('.price-btn.active')).map(b => b.dataset.value);
+            if (selectedPrices.length > 0) params.set('price', selectedPrices.join(','));
+
+            // Open at
+            const dateVal = document.getElementById('filter-date').value;
+            const timeVal = document.getElementById('filter-time').value;
+            if (dateVal && timeVal) {
+                const ts = Math.floor(new Date(dateVal + 'T' + timeVal).getTime() / 1000);
+                if (ts > 0) params.set('open_at', ts);
+            }
+
+            try {
+                const resp = await fetch('api/search.php?' + params.toString());
+                const data = await resp.json();
+                if (!resp.ok) {
+                    showNotification(data.error || 'Search failed (' + resp.status + ')', 'error');
+                } else {
+                    displayResults(data.results);
+                }
+            } catch (err) {
+                showNotification('Network error: could not reach server.', 'error');
+            } finally {
+                isSearching = false;
+                updateSearchButtonState();
+            }
+        }
+
+        document.getElementById('search-btn').addEventListener('click', performSearch);
 
         // Map init
         const map = L.map('map').setView([43.6532, -79.3832], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
+
+        // Window resize safety
+        window.addEventListener('resize', function () { map.invalidateSize(); });
 
         // Radius control
         const RadiusControl = L.Control.extend({
@@ -106,6 +550,7 @@
             });
 
             console.log('Pin placed:', { lat, lng, radius: selectedRadius });
+            updateSearchButtonState();
         }
 
         // Update pin position (on drag)
@@ -114,6 +559,7 @@
             pinLng = lng;
             currentCircle.setLatLng([lat, lng]);
             console.log('Pin moved:', { lat, lng, radius: selectedRadius });
+            updateSearchButtonState();
         }
 
         // Click to place pin

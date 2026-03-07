@@ -232,6 +232,193 @@
             z-index: 1000;
             pointer-events: none;
         }
+
+        /* Main content row */
+        #main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: row;
+            min-height: 0;
+            position: relative;
+        }
+
+        /* Results panel */
+        #results-panel {
+            width: 380px;
+            min-width: 380px;
+            background: #fff;
+            border-right: 1px solid #e5e7eb;
+            overflow-y: auto;
+            display: none;
+            flex-direction: column;
+            z-index: 500;
+        }
+
+        /* Panel toggle button */
+        #panel-toggle {
+            display: none;
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 600;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-left: none;
+            border-radius: 0 6px 6px 0;
+            padding: 12px 4px;
+            cursor: pointer;
+            font-size: 16px;
+            color: #555;
+            box-shadow: 2px 0 6px rgba(0,0,0,0.1);
+            line-height: 1;
+            transition: left 0.3s ease;
+        }
+        #panel-toggle:hover { background: #f3f4f6; }
+        #panel-toggle.panel-open { left: 380px; }
+
+        /* Result cards */
+        .result-cards { padding: 0; flex: 1; }
+        .result-card {
+            padding: 14px 16px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            transition: background 0.15s;
+            position: relative;
+        }
+        .result-card:hover { background: #f9fafb; }
+        .result-card.active-card { background: #eff6ff; }
+        @keyframes card-flash {
+            0% { background: #dbeafe; }
+            100% { background: transparent; }
+        }
+        .result-card.flash { animation: card-flash 1s ease; }
+        .card-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+        .card-number {
+            background: #dc2626;
+            color: #fff;
+            border-radius: 50%;
+            width: 26px;
+            height: 26px;
+            min-width: 26px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 700;
+        }
+        .card-title-row { flex: 1; min-width: 0; }
+        .card-name {
+            font-size: 15px;
+            font-weight: 600;
+            color: #111;
+            text-decoration: none;
+            line-height: 1.3;
+        }
+        .card-name:hover { color: #2563eb; }
+        .card-closed {
+            display: inline-block;
+            background: #dc2626;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 1px 6px;
+            border-radius: 3px;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+        .card-rating {
+            font-size: 13px;
+            margin-top: 2px;
+        }
+        .card-rating .stars { color: #f59e0b; }
+        .card-rating .rating-num { color: #333; font-weight: 500; }
+        .card-rating .review-count { color: #888; font-size: 12px; }
+        .card-price { color: #555; font-size: 13px; font-weight: 500; }
+        .card-meta {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+            margin-top: 4px;
+        }
+        .card-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 6px;
+        }
+        .card-tag {
+            background: #f3f4f6;
+            color: #555;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+        .card-address, .card-phone {
+            font-size: 12px;
+            color: #888;
+            margin-top: 4px;
+        }
+        .card-distance {
+            font-size: 12px;
+            color: #2563eb;
+            font-weight: 500;
+        }
+
+        /* Panel empty state */
+        .panel-empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #888;
+            font-size: 14px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* Google attribution */
+        .panel-attribution {
+            padding: 10px 16px;
+            text-align: center;
+            font-size: 11px;
+            color: #aaa;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        /* Highlighted marker */
+        .result-marker.highlighted {
+            transform: scale(1.35);
+            box-shadow: 0 0 0 4px rgba(37,99,235,0.4), 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        /* Mobile: panel overlays map at full width */
+        @media (max-width: 767px) {
+            #results-panel {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                min-width: 100%;
+                height: 100%;
+                z-index: 550;
+            }
+            #panel-toggle.panel-open {
+                left: auto;
+                top: 8px;
+                right: 8px;
+                transform: none;
+                border-radius: 6px;
+                border: 1px solid #e5e7eb;
+                z-index: 600;
+            }
+        }
     </style>
 </head>
 <body>
@@ -261,7 +448,14 @@
         </label>
         <button type="button" id="search-btn" disabled>Drop a pin to search</button>
     </div>
-    <div id="map"></div>
+    <div id="main-content">
+        <div id="results-panel">
+            <div class="result-cards" id="result-cards"></div>
+            <div class="panel-attribution" id="panel-attribution" style="display:none;">Powered by Google</div>
+        </div>
+        <button type="button" id="panel-toggle">&#x276F;</button>
+        <div id="map"></div>
+    </div>
     <div id="notification"></div>
     <div id="api-counter"></div>
     <script>
@@ -274,6 +468,9 @@
         let resultMarkers = [];
         let isSearching = false;
         let apiCallCount = parseInt(localStorage.getItem('eatout_api_calls') || '0', 10);
+        let panelOpen = false;
+        let searchResults = [];
+        let activeCardIndex = -1;
 
         // Update API counter display
         function updateApiCounter() {
@@ -387,19 +584,184 @@
             }
         }
 
-        // Clear result markers
+        // Clear result markers and panel
         function clearResultMarkers() {
             resultMarkers.forEach(m => map.removeLayer(m));
             resultMarkers = [];
+            searchResults = [];
+            activeCardIndex = -1;
+            document.getElementById('result-cards').innerHTML = '';
+            document.getElementById('panel-attribution').style.display = 'none';
+            if (panelOpen) hideResultsPanel();
         }
 
-        // Display results on map
-        function displayResults(results) {
-            clearResultMarkers();
+        // Build cuisine label lookup
+        const cuisineLabelMap = {};
+        cuisineTypes.forEach(c => { cuisineLabelMap[c.value] = c.label; });
+
+        function friendlyCuisine(tag) {
+            if (cuisineLabelMap[tag]) return cuisineLabelMap[tag];
+            return tag.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        }
+
+        function formatDistance(lat1, lng1, lat2, lng2) {
+            const d = map.distance([lat1, lng1], [lat2, lng2]);
+            if (d < 1000) return Math.round(d) + 'm';
+            return (d / 1000).toFixed(1) + 'km';
+        }
+
+        // Panel show/hide with slide animation
+        function panelSlideOffset() {
+            return window.innerWidth < 768 ? -window.innerWidth : -380;
+        }
+
+        function showResultsPanel() {
+            var panel = document.getElementById('results-panel');
+            var toggle = document.getElementById('panel-toggle');
+            if (panel.style.display !== 'flex') {
+                panel.style.transition = 'none';
+                panel.style.display = 'flex';
+                panel.style.marginLeft = panelSlideOffset() + 'px';
+                panel.offsetHeight; // reflow to register starting position
+            }
+            panel.style.transition = 'margin-left 0.3s ease';
+            panel.style.marginLeft = '0px';
+            panel.classList.add('visible');
+            toggle.style.display = 'block';
+            toggle.classList.add('panel-open');
+            toggle.innerHTML = '&#x276E;';
+            panelOpen = true;
+            setTimeout(function() { map.invalidateSize(); }, 320);
+        }
+
+        function hideResultsPanel() {
+            var panel = document.getElementById('results-panel');
+            var toggle = document.getElementById('panel-toggle');
+            panel.style.transition = 'margin-left 0.3s ease';
+            panel.style.marginLeft = panelSlideOffset() + 'px';
+            panel.classList.remove('visible');
+            toggle.classList.remove('panel-open');
+            toggle.innerHTML = '&#x276F;';
+            panelOpen = false;
+            setTimeout(function() {
+                if (!panelOpen) panel.style.display = 'none';
+                map.invalidateSize();
+            }, 320);
+        }
+
+        function toggleResultsPanel() {
+            if (panelOpen) hideResultsPanel();
+            else showResultsPanel();
+        }
+
+        document.getElementById('panel-toggle').addEventListener('click', toggleResultsPanel);
+
+        // Marker highlight
+        function highlightMarker(index) {
+            if (index < 0 || index >= resultMarkers.length) return;
+            const marker = resultMarkers[index];
+            const icon = L.divIcon({
+                className: '',
+                html: '<div class="result-marker highlighted">' + (index + 1) + '</div>',
+                iconSize: [28, 28],
+                iconAnchor: [14, 14],
+            });
+            marker.setIcon(icon);
+        }
+
+        function unhighlightMarker(index) {
+            if (index < 0 || index >= resultMarkers.length) return;
+            const marker = resultMarkers[index];
+            const icon = L.divIcon({
+                className: '',
+                html: '<div class="result-marker">' + (index + 1) + '</div>',
+                iconSize: [28, 28],
+                iconAnchor: [14, 14],
+            });
+            marker.setIcon(icon);
+        }
+
+        function scrollToCard(index) {
+            const card = document.querySelector('.result-card[data-index="' + index + '"]');
+            if (!card) return;
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            card.classList.remove('flash');
+            card.offsetHeight; // reflow
+            card.classList.add('flash');
+        }
+
+        // Render result cards
+        function renderResultCards(results) {
+            const container = document.getElementById('result-cards');
+            container.innerHTML = '';
+
             if (results.length === 0) {
-                showNotification('No restaurants found in this area.', 'info');
+                container.innerHTML = '<div class="panel-empty">No restaurants found in this area.</div>';
+                document.getElementById('panel-attribution').style.display = 'none';
                 return;
             }
+
+            results.forEach((r, i) => {
+                const card = document.createElement('div');
+                card.className = 'result-card';
+                card.dataset.index = i;
+
+                const stars = '\u2605'.repeat(Math.round(r.rating || 0));
+                const price = r.price_level ? '$'.repeat(r.price_level) : '';
+                const dist = (pinLat !== null) ? formatDistance(pinLat, pinLng, r.latitude, r.longitude) : '';
+                const tags = (r.cuisine_tags || []).slice(0, 3).map(t => '<span class="card-tag">' + escapeHtml(friendlyCuisine(t)) + '</span>').join('');
+
+                let html = '<div class="card-header">';
+                html += '<div class="card-number">' + (i + 1) + '</div>';
+                html += '<div class="card-title-row">';
+                html += '<a class="card-name" href="' + escapeHtml(r.source_url || '#') + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' + escapeHtml(r.name) + '</a>';
+                if (r.is_closed) html += '<span class="card-closed">Closed</span>';
+                if (r.rating) {
+                    html += '<div class="card-rating"><span class="stars">' + stars + '</span> <span class="rating-num">' + r.rating + '</span>';
+                    if (r.review_count) html += ' <span class="review-count">(' + r.review_count + ' reviews)</span>';
+                    html += '</div>';
+                }
+                html += '</div></div>';
+
+                html += '<div class="card-meta">';
+                if (price) html += '<span class="card-price">' + price + '</span>';
+                if (dist) html += '<span class="card-distance">' + dist + '</span>';
+                html += '</div>';
+
+                if (tags) html += '<div class="card-tags">' + tags + '</div>';
+                if (r.address) html += '<div class="card-address">' + escapeHtml(r.address) + '</div>';
+                if (r.phone) html += '<div class="card-phone">' + escapeHtml(r.phone) + '</div>';
+
+                card.innerHTML = html;
+
+                // Card interactions
+                card.addEventListener('mouseenter', () => highlightMarker(i));
+                card.addEventListener('mouseleave', () => unhighlightMarker(i));
+                card.addEventListener('click', () => {
+                    if (i < resultMarkers.length) {
+                        map.panTo(resultMarkers[i].getLatLng());
+                        resultMarkers[i].openPopup();
+                    }
+                });
+
+                container.appendChild(card);
+            });
+
+            document.getElementById('panel-attribution').style.display = 'block';
+        }
+
+        // Display results on map and panel
+        function displayResults(results) {
+            clearResultMarkers();
+            searchResults = results;
+
+            if (results.length === 0) {
+                showNotification('No restaurants found in this area.', 'info');
+                renderResultCards([]);
+                showResultsPanel();
+                return;
+            }
+
             results.forEach((r, i) => {
                 const icon = L.divIcon({
                     className: '',
@@ -422,8 +784,21 @@
                 if (r.source_url) html += '<a href="' + escapeHtml(r.source_url) + '" target="_blank" rel="noopener">View on Google Maps</a>';
                 html += '</div>';
                 marker.bindPopup(html);
+
+                // Marker click → scroll to card
+                marker.on('click', () => {
+                    if (panelOpen) scrollToCard(i);
+                    else {
+                        showResultsPanel();
+                        setTimeout(() => scrollToCard(i), 350);
+                    }
+                });
+
                 resultMarkers.push(marker);
             });
+
+            renderResultCards(results);
+            showResultsPanel();
         }
 
         function escapeHtml(str) {

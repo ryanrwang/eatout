@@ -14,7 +14,7 @@ class GooglePlacesProvider implements ProviderInterface
         . 'places.rating,places.priceLevel,places.types,places.photos,'
         . 'places.nationalPhoneNumber,places.websiteUri,places.regularOpeningHours,'
         . 'places.userRatingCount,places.id,'
-        . 'places.dineIn,places.takeaway,places.delivery';
+        . 'places.dineIn,places.takeout,places.delivery';
 
     private const PRICE_LEVEL_MAP = [
         'PRICE_LEVEL_FREE'           => 0,
@@ -131,7 +131,7 @@ class GooglePlacesProvider implements ProviderInterface
             'review_count' => (int) ($place['userRatingCount'] ?? 0),
             'transactions' => array_values(array_filter([
                 ($place['dineIn'] ?? false) ? 'dine_in' : null,
-                ($place['takeaway'] ?? false) ? 'takeout' : null,
+                ($place['takeout'] ?? false) ? 'takeout' : null,
                 ($place['delivery'] ?? false) ? 'delivery' : null,
             ])),
             'is_closed'    => $openNow === null ? false : !$openNow,

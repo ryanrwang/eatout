@@ -151,6 +151,24 @@
             border-color: #2563eb;
         }
 
+        /* Service type toggles */
+        .service-group { display: flex; gap: 2px; }
+        .service-btn {
+            border: 1px solid #d1d5db;
+            background: #fff;
+            padding: 4px 8px;
+            font-size: 13px;
+            cursor: pointer;
+            color: #333;
+        }
+        .service-btn:first-child { border-radius: 4px 0 0 4px; }
+        .service-btn:last-child { border-radius: 0 4px 4px 0; }
+        .service-btn.active {
+            background: #2563eb;
+            color: #fff;
+            border-color: #2563eb;
+        }
+
         /* Search button */
         #search-btn {
             padding: 5px 16px;
@@ -407,6 +425,21 @@
             padding: 2px 8px;
             border-radius: 10px;
         }
+        .card-services {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 4px;
+        }
+        .service-badge {
+            display: inline-block;
+            background: #e0f2fe;
+            color: #0369a1;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 500;
+        }
         .card-address, .card-phone {
             font-size: 12px;
             color: #888;
@@ -644,6 +677,7 @@
 
         /* Focus styles */
         .price-btn:focus-visible,
+        .service-btn:focus-visible,
         .cuisine-btn:focus-visible,
         .radius-btn:focus-visible,
         .card-number:focus-visible,
@@ -723,6 +757,9 @@
             #filter-controls .price-group {
                 justify-content: flex-start;
             }
+            #filter-controls .service-group {
+                justify-content: flex-start;
+            }
         }
     </style>
 </head>
@@ -739,6 +776,11 @@
                 <button type="button" class="price-btn" data-value="2">$$</button>
                 <button type="button" class="price-btn" data-value="3">$$$</button>
                 <button type="button" class="price-btn" data-value="4">$$$$</button>
+            </div>
+            <div class="service-group">
+                <button type="button" class="service-btn" data-value="dine_in">Dine-in</button>
+                <button type="button" class="service-btn" data-value="takeout">Takeout</button>
+                <button type="button" class="service-btn" data-value="delivery">Delivery</button>
             </div>
             <input type="date" id="filter-date">
             <input type="time" id="filter-time">
@@ -799,7 +841,7 @@
                 image_url: "", phone: "(416) 901-4724", source: "google",
                 source_url: "https://www.google.com/maps/place/?q=place_id:ChIJDbmGBaY0K4gRSTkwBKFSDgM",
                 source_id: "ChIJDbmGBaY0K4gRSTkwBKFSDgM", distance: 0.0,
-                review_count: 4812, transactions: [], is_closed: false
+                review_count: 4812, transactions: ['dine_in', 'takeout', 'delivery'], is_closed: false
             },
             {
                 name: "Kinka Izakaya Original", address: "398 Church St, Toronto, ON M5B 2A2",
@@ -808,7 +850,7 @@
                 image_url: "", phone: "(416) 977-0999", source: "google",
                 source_url: "https://www.google.com/maps/place/?q=place_id:ChIJTSRBqKc0K4gRkH1MlUKJOGE",
                 source_id: "ChIJTSRBqKc0K4gRkH1MlUKJOGE", distance: 0.0,
-                review_count: 3241, transactions: [], is_closed: false
+                review_count: 3241, transactions: ['dine_in', 'takeout'], is_closed: false
             },
             {
                 name: "Richmond Station", address: "1 Richmond St W, Toronto, ON M5H 3W4",
@@ -817,7 +859,7 @@
                 image_url: "", phone: "(647) 748-1444", source: "google",
                 source_url: "https://www.google.com/maps/place/?q=place_id:ChIJm8Oc3qU0K4gRpkOXSGKTMhQ",
                 source_id: "ChIJm8Oc3qU0K4gRpkOXSGKTMhQ", distance: 0.0,
-                review_count: 1823, transactions: [], is_closed: true
+                review_count: 1823, transactions: ['dine_in'], is_closed: true
             },
             {
                 name: "Byblos Toronto", address: "11 Duncan St, Toronto, ON M5H 3G8",
@@ -826,7 +868,7 @@
                 image_url: "", phone: "(416) 637-7575", source: "google",
                 source_url: "https://www.google.com/maps/place/?q=place_id:ChIJY7aDzaY0K4gRQ0K1fXn5n4o",
                 source_id: "ChIJY7aDzaY0K4gRQ0K1fXn5n4o", distance: 0.0,
-                review_count: 2456, transactions: [], is_closed: false
+                review_count: 2456, transactions: ['dine_in'], is_closed: false
             },
             {
                 name: "Sansotei Ramen", address: "179 Dundas St W, Toronto, ON M5G 1C7",
@@ -835,7 +877,7 @@
                 image_url: "", phone: "(647) 748-3833", source: "google",
                 source_url: "https://www.google.com/maps/place/?q=place_id:ChIJ8xWPxqU0K4gR3S4DF9YIDQ0",
                 source_id: "ChIJ8xWPxqU0K4gR3S4DF9YIDQ0", distance: 0.0,
-                review_count: 987, transactions: [], is_closed: false
+                review_count: 987, transactions: ['takeout', 'delivery'], is_closed: false
             }
         ];
 
@@ -979,12 +1021,13 @@
         function saveFiltersToSession() {
             var cuisines = Array.from(cuisineDropdown.querySelectorAll('input:checked')).map(function(cb) { return cb.value; });
             var prices = Array.from(document.querySelectorAll('.price-btn.active')).map(function(b) { return parseInt(b.dataset.value); });
+            var services = Array.from(document.querySelectorAll('.service-btn.active')).map(function(b) { return b.dataset.value; });
             var sort = document.getElementById('filter-sort').value;
             var date = document.getElementById('filter-date').value;
             var time = document.getElementById('filter-time').value;
             var party = parseInt(document.getElementById('filter-party').value) || 1;
             sessionStorage.setItem('eatout_filters', JSON.stringify({
-                cuisines: cuisines, prices: prices, sort: sort, date: date, time: time, party: party
+                cuisines: cuisines, prices: prices, services: services, sort: sort, date: date, time: time, party: party
             }));
         }
 
@@ -1004,6 +1047,11 @@
                         b.classList.toggle('active', f.prices.indexOf(parseInt(b.dataset.value)) !== -1);
                     });
                 }
+                if (f.services && f.services.length) {
+                    document.querySelectorAll('.service-btn').forEach(function(b) {
+                        b.classList.toggle('active', f.services.indexOf(b.dataset.value) !== -1);
+                    });
+                }
                 if (f.sort) document.getElementById('filter-sort').value = f.sort;
                 if (f.date) document.getElementById('filter-date').value = f.date;
                 if (f.time) document.getElementById('filter-time').value = f.time;
@@ -1016,6 +1064,7 @@
             var count = 0;
             count += cuisineDropdown.querySelectorAll('input:checked').length;
             count += document.querySelectorAll('.price-btn.active').length;
+            count += document.querySelectorAll('.service-btn.active').length;
             if (document.getElementById('filter-sort').value !== 'best_match') count++;
             if (document.getElementById('filter-party').value !== '1') count++;
             return count;
@@ -1052,6 +1101,15 @@
 
         // Price buttons
         document.querySelectorAll('.price-btn').forEach(function(btn) {
+            btn.addEventListener('click', function () {
+                btn.classList.toggle('active');
+                saveFiltersToSession();
+                updateMobileFilterBadge();
+            });
+        });
+
+        // Service type buttons
+        document.querySelectorAll('.service-btn').forEach(function(btn) {
             btn.addEventListener('click', function () {
                 btn.classList.toggle('active');
                 saveFiltersToSession();
@@ -1534,6 +1592,17 @@
                 html += '</div>';
 
                 if (tags) html += '<div class="card-tags">' + tags + '</div>';
+
+                // Service type badges
+                var serviceLabels = { dine_in: 'Dine-in', takeout: 'Takeout', delivery: 'Delivery' };
+                if (r.transactions && r.transactions.length > 0) {
+                    html += '<div class="card-services">';
+                    r.transactions.forEach(function(t) {
+                        if (serviceLabels[t]) html += '<span class="service-badge">' + serviceLabels[t] + '</span>';
+                    });
+                    html += '</div>';
+                }
+
                 if (r.address) html += '<div class="card-address">' + escapeHtml(r.address) + '</div>';
                 if (r.phone) html += '<div class="card-phone">' + escapeHtml(r.phone) + '</div>';
 
@@ -1651,11 +1720,18 @@
             // Debug mode: use mock data
             if (debugMode) {
                 await new Promise(r => setTimeout(r, 400 + Math.random() * 300));
-                const results = MOCK_RESULTS.map((r, i) => ({
+                let results = MOCK_RESULTS.map((r, i) => ({
                     ...r,
                     latitude: pinLat + (r.latitude - 43.6532) * 0.5,
                     longitude: pinLng + (r.longitude - (-79.3832)) * 0.5,
                 }));
+                const debugActiveServices = Array.from(document.querySelectorAll('.service-btn.active')).map(b => b.dataset.value);
+                if (debugActiveServices.length > 0) {
+                    results = results.filter(r =>
+                        debugActiveServices.every(s => (r.transactions || []).includes(s))
+                    );
+                }
+                results = results.slice(0, 10);
                 displayResults(results);
                 showNotification('Debug mode: showing mock data', 'info');
                 isSearching = false;
@@ -1674,7 +1750,7 @@
             params.set('longitude', pinLng);
             params.set('radius', selectedRadius);
             params.set('sort_by', document.getElementById('filter-sort').value);
-            params.set('limit', '5');
+            params.set('limit', '20');
 
             const selectedCuisines = Array.from(cuisineDropdown.querySelectorAll('input:checked')).map(cb => cb.value);
             if (selectedCuisines.length > 0) params.set('categories', selectedCuisines.join(','));
@@ -1695,7 +1771,20 @@
                 if (!resp.ok) {
                     showNotification(data.error || 'Search failed (' + resp.status + ')', 'error');
                 } else {
-                    displayResults(data.results);
+                    let results = data.results;
+
+                    // Post-filter by service type
+                    const activeServices = Array.from(document.querySelectorAll('.service-btn.active')).map(b => b.dataset.value);
+                    if (activeServices.length > 0) {
+                        results = results.filter(r =>
+                            activeServices.every(s => (r.transactions || []).includes(s))
+                        );
+                    }
+
+                    // Cap displayed results at 10
+                    results = results.slice(0, 10);
+
+                    displayResults(results);
                 }
             } catch (err) {
                 showNotification('Network error: could not reach server.', 'error');

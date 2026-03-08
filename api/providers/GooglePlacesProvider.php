@@ -13,7 +13,8 @@ class GooglePlacesProvider implements ProviderInterface
     private const FIELD_MASK = 'places.displayName,places.formattedAddress,places.location,'
         . 'places.rating,places.priceLevel,places.types,places.photos,'
         . 'places.nationalPhoneNumber,places.websiteUri,places.regularOpeningHours,'
-        . 'places.userRatingCount,places.id';
+        . 'places.userRatingCount,places.id,'
+        . 'places.dineIn,places.takeaway,places.delivery';
 
     private const PRICE_LEVEL_MAP = [
         'PRICE_LEVEL_FREE'           => 0,
@@ -53,6 +54,8 @@ class GooglePlacesProvider implements ProviderInterface
 
         if ($categories !== '') {
             $body['includedTypes'] = explode(',', $categories);
+        } else {
+            $body['includedTypes'] = ['restaurant'];
         }
 
         $response = $this->executeRequest($body);
@@ -126,7 +129,11 @@ class GooglePlacesProvider implements ProviderInterface
             'source_id'    => $place['id'] ?? '',
             'distance'     => 0.0,
             'review_count' => (int) ($place['userRatingCount'] ?? 0),
-            'transactions' => [],
+            'transactions' => array_values(array_filter([
+                ($place['dineIn'] ?? false) ? 'dine_in' : null,
+                ($place['takeaway'] ?? false) ? 'takeout' : null,
+                ($place['delivery'] ?? false) ? 'delivery' : null,
+            ])),
             'is_closed'    => $openNow === null ? false : !$openNow,
         ];
     }

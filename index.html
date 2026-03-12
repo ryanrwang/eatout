@@ -5,53 +5,61 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Find restaurants near you on a map. Search by cuisine, price, and more.">
     <title>Eatout</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232563eb'%3E%3Cpath d='M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z'/%3E%3C/svg%3E">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232358DA'%3E%3Cpath d='M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z'/%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=8" />
 </head>
 <body>
     <div id="main-content">
         <div id="map"></div>
         <div id="filter-bar">
             <div id="filter-primary">
+                <div class="filter-pin-dot"></div>
                 <div class="cuisine-wrapper">
-                    <button type="button" class="cuisine-btn" id="cuisine-toggle">Cuisine</button>
+                    <button type="button" class="cuisine-btn" id="cuisine-toggle"><span class="material-symbols-outlined">fork_spoon</span><span class="filter-label">Any cuisine</span></button>
                     <div class="cuisine-dropdown" id="cuisine-dropdown"></div>
                 </div>
                 <div class="price-wrapper">
-                    <button type="button" class="price-toggle-btn" id="price-toggle">Price</button>
+                    <button type="button" class="price-toggle-btn" id="price-toggle"><span class="material-symbols-outlined">paid</span><span class="filter-label">Any price</span></button>
                     <div class="price-dropdown" id="price-dropdown">
-                        <div class="price-range-labels">
-                            <span>$</span><span>$$</span><span>$$$</span><span>$$$$</span>
+                        <div class="price-items">
+                            <label class="price-check-label"><input type="checkbox" value="1"> $</label>
+                            <label class="price-check-label"><input type="checkbox" value="2"> $$</label>
+                            <label class="price-check-label"><input type="checkbox" value="3"> $$$</label>
+                            <label class="price-check-label"><input type="checkbox" value="4"> $$$$</label>
                         </div>
-                        <div class="price-range-track" id="price-range-track">
-                            <div class="price-range-fill" id="price-range-fill"></div>
-                            <div class="price-range-knob" id="price-knob-min" data-knob="min"></div>
-                            <div class="price-range-knob" id="price-knob-max" data-knob="max"></div>
+                        <div class="price-footer">
+                            <button type="button" class="btn-tertiary btn-s price-clear-btn">Clear</button>
+                            <button type="button" class="btn-primary btn-s price-apply-btn">Apply</button>
                         </div>
                     </div>
                 </div>
-                <input type="date" id="filter-date">
+                <div class="date-wrapper">
+                    <button type="button" class="date-btn" id="date-toggle"><span class="material-symbols-outlined">calendar_today</span><span class="filter-label" id="date-display">Any date</span></button>
+                    <input type="hidden" id="filter-date" value="">
+                    <div class="date-dropdown" id="date-dropdown"></div>
+                </div>
                 <div class="time-wrapper">
-                    <button type="button" class="time-btn" id="time-toggle">8:00 PM</button>
-                    <input type="hidden" id="filter-time" value="20:00">
+                    <button type="button" class="time-btn" id="time-toggle"><span class="material-symbols-outlined">pace</span><span class="filter-label">Any time</span></button>
+                    <input type="hidden" id="filter-time" value="">
                     <div class="time-dropdown" id="time-dropdown"></div>
                 </div>
                 <div class="radius-wrapper">
-                    <button type="button" class="radius-toggle-btn" id="radius-toggle">1km</button>
+                    <button type="button" class="radius-toggle-btn filter-active" id="radius-toggle"><span class="material-symbols-outlined">adjust</span><span class="filter-label">1km</span></button>
                     <div class="radius-dropdown" id="radius-dropdown">
                         <button type="button" class="radius-opt" data-value="500">500m</button>
+                        <button type="button" class="radius-opt" data-value="750">750m</button>
                         <button type="button" class="radius-opt" data-value="1000">1km</button>
+                        <button type="button" class="radius-opt" data-value="1500">1.5km</button>
                         <button type="button" class="radius-opt" data-value="2000">2km</button>
                         <button type="button" class="radius-opt" data-value="5000">5km</button>
                     </div>
                 </div>
-                <button type="button" id="search-btn" disabled>Search</button>
             </div>
         </div>
         <div id="results-panel">
@@ -75,6 +83,6 @@
     <div id="notification"></div>
     <div id="api-counter"></div>
     <button type="button" id="debug-btn" title="Use mock data instead of real API">Debug</button>
-    <script src="app.js"></script>
+    <script src="app.js?v=8"></script>
 </body>
 </html>

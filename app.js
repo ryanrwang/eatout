@@ -175,47 +175,70 @@ const cuisineTypes = [
 
 // Build cuisine dropdown checkboxes
 const cuisineDropdown = document.getElementById('cuisine-dropdown');
+const cuisineItems = document.createElement('div');
+cuisineItems.className = 'cuisine-items';
+cuisineDropdown.appendChild(cuisineItems);
 cuisineTypes.forEach(c => {
     const lbl = document.createElement('label');
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.value = c.value;
     cb.addEventListener('change', function() {
-        updateCuisineBadge();
+        updateCuisineToggle();
         saveFiltersToSession();
     });
     lbl.appendChild(cb);
     lbl.appendChild(document.createTextNode(c.label));
-    cuisineDropdown.appendChild(lbl);
+    cuisineItems.appendChild(lbl);
 });
 
-// Cuisine clear button
+// Cuisine footer: Clear all + Apply
 (function() {
+    var footer = document.createElement('div');
+    footer.className = 'cuisine-footer';
+
     var clearBtn = document.createElement('button');
     clearBtn.type = 'button';
-    clearBtn.className = 'cuisine-clear-btn';
+    clearBtn.className = 'btn-tertiary btn-s cuisine-clear-btn';
     clearBtn.textContent = 'Clear all';
     clearBtn.addEventListener('click', function(e) {
         e.stopPropagation();
         cuisineDropdown.querySelectorAll('input:checked').forEach(function(cb) {
             cb.checked = false;
         });
-        updateCuisineBadge();
+        updateCuisineToggle();
         saveFiltersToSession();
     });
-    cuisineDropdown.appendChild(clearBtn);
+
+    var applyBtn = document.createElement('button');
+    applyBtn.type = 'button';
+    applyBtn.className = 'btn-primary btn-s cuisine-apply-btn';
+    applyBtn.textContent = 'Apply';
+    applyBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        cuisineDropdown.classList.remove('open');
+    });
+
+    footer.appendChild(clearBtn);
+    footer.appendChild(applyBtn);
+    cuisineDropdown.appendChild(footer);
 })();
 
-function updateCuisineBadge() {
-    const count = cuisineDropdown.querySelectorAll('input:checked').length;
+function updateCuisineToggle() {
+    const checked = Array.from(cuisineDropdown.querySelectorAll('input:checked'));
+    const count = checked.length;
     const btn = document.getElementById('cuisine-toggle');
-    const existing = btn.querySelector('.cuisine-badge');
-    if (existing) existing.remove();
-    if (count > 0) {
-        const badge = document.createElement('span');
-        badge.className = 'cuisine-badge';
-        badge.textContent = count;
-        btn.appendChild(badge);
+    const label = btn.querySelector('.filter-label');
+    if (count === 0) {
+        label.textContent = 'Any cuisine';
+        btn.classList.remove('filter-active');
+    } else if (count === 1) {
+        var match = cuisineTypes.find(function(c) { return c.value === checked[0].value; });
+        label.textContent = match ? match.label : checked[0].value;
+        btn.classList.add('filter-active');
+    } else {
+        label.textContent = count + ' Cuisines';
+        btn.classList.add('filter-active');
     }
 }
 
@@ -242,13 +265,16 @@ function restoreFiltersFromSession() {
             cuisineDropdown.querySelectorAll('input').forEach(function(cb) {
                 cb.checked = f.cuisines.indexOf(cb.value) !== -1;
             });
-            updateCuisineBadge();
+            updateCuisineToggle();
         }
         if (f.priceRange && window._setPriceRange) {
             window._setPriceRange(f.priceRange.min, f.priceRange.max);
         }
         if (f.sort) document.getElementById('filter-sort').value = f.sort;
-        if (f.date) document.getElementById('filter-date').value = f.date;
+        if (f.date) {
+            document.getElementById('filter-date').value = f.date;
+            updateDateToggle();
+        }
         if (f.time) {
             document.getElementById('filter-time').value = f.time;
             if (window._syncTimeDisplay) window._syncTimeDisplay();
@@ -261,9 +287,17 @@ function restoreFiltersFromSession() {
 }
 
 // Close all filter dropdowns
+function anyDropdownOpen() {
+    return cuisineDropdown.classList.contains('open') ||
+        document.getElementById('price-dropdown').classList.contains('open') ||
+        document.getElementById('date-dropdown').classList.contains('open') ||
+        document.getElementById('time-dropdown').classList.contains('open') ||
+        document.getElementById('radius-dropdown').classList.contains('open');
+}
 function closeAllDropdowns() {
     cuisineDropdown.classList.remove('open');
     document.getElementById('price-dropdown').classList.remove('open');
+    document.getElementById('date-dropdown').classList.remove('open');
     document.getElementById('time-dropdown').classList.remove('open');
     document.getElementById('radius-dropdown').classList.remove('open');
 }
@@ -299,119 +333,239 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// Price range slider (dual knob)
+// Price checkboxes
 (function() {
-    var priceMin = 1, priceMax = 4;
-    var track = document.getElementById('price-range-track');
-    var fill = document.getElementById('price-range-fill');
-    var knobMin = document.getElementById('price-knob-min');
-    var knobMax = document.getElementById('price-knob-max');
-    var steps = 4; // $, $$, $$$, $$$$
-
-    function valToPercent(v) { return ((v - 1) / (steps - 1)) * 100; }
-    function percentToVal(p) { return Math.round(p / 100 * (steps - 1)) + 1; }
-
-    function updateSliderUI() {
-        var minP = valToPercent(priceMin);
-        var maxP = valToPercent(priceMax);
-        knobMin.style.left = minP + '%';
-        knobMax.style.left = maxP + '%';
-        fill.style.left = minP + '%';
-        fill.style.width = (maxP - minP) + '%';
-        // Update toggle button text
-        var btn = document.getElementById('price-toggle');
-        var labels = ['$', '$$', '$$$', '$$$$'];
-        if (priceMin === 1 && priceMax === 4) {
-            btn.textContent = 'Price';
-        } else if (priceMin === priceMax) {
-            btn.textContent = labels[priceMin - 1];
-        } else {
-            btn.textContent = labels[priceMin - 1] + '\u2013' + labels[priceMax - 1];
-        }
-    }
+    var dd = document.getElementById('price-dropdown');
+    var labels = ['$', '$$', '$$$', '$$$$'];
 
     function getActivePrices() {
-        var arr = [];
-        for (var i = priceMin; i <= priceMax; i++) arr.push(i);
-        return arr;
+        return Array.from(dd.querySelectorAll('input:checked')).map(function(cb) { return parseInt(cb.value); });
     }
 
-    function handleDrag(knob, e) {
-        e.preventDefault();
-        e.stopPropagation();
-        var rect = track.getBoundingClientRect();
-        function onMove(ev) {
-            var clientX = ev.touches ? ev.touches[0].clientX : ev.clientX;
-            var pct = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
-            var val = percentToVal(pct);
-            if (knob === knobMin) {
-                priceMin = Math.min(val, priceMax);
-            } else {
-                priceMax = Math.max(val, priceMin);
-            }
-            updateSliderUI();
-        }
-        function onUp() {
-            document.removeEventListener('mousemove', onMove);
-            document.removeEventListener('mouseup', onUp);
-            document.removeEventListener('touchmove', onMove);
-            document.removeEventListener('touchend', onUp);
-            saveFiltersToSession();
-        }
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onUp);
-        document.addEventListener('touchmove', onMove, { passive: false });
-        document.addEventListener('touchend', onUp);
-    }
-
-    knobMin.addEventListener('mousedown', function(e) { handleDrag(knobMin, e); });
-    knobMin.addEventListener('touchstart', function(e) { handleDrag(knobMin, e); }, { passive: false });
-    knobMax.addEventListener('mousedown', function(e) { handleDrag(knobMax, e); });
-    knobMax.addEventListener('touchstart', function(e) { handleDrag(knobMax, e); }, { passive: false });
-
-    // Click on track to jump nearest knob
-    track.addEventListener('click', function(e) {
-        if (e.target.classList.contains('price-range-knob')) return;
-        var rect = track.getBoundingClientRect();
-        var pct = ((e.clientX - rect.left) / rect.width) * 100;
-        var val = percentToVal(pct);
-        // Move whichever knob is closer
-        if (Math.abs(val - priceMin) <= Math.abs(val - priceMax)) {
-            priceMin = Math.min(val, priceMax);
+    function updateToggle() {
+        var btn = document.getElementById('price-toggle');
+        var label = btn.querySelector('.filter-label');
+        var active = getActivePrices().sort();
+        var priceText;
+        if (active.length === 0 || active.length === 4) {
+            priceText = 'Any price';
+            btn.classList.remove('filter-active');
         } else {
-            priceMax = Math.max(val, priceMin);
+            // Check if contiguous
+            var isContiguous = true;
+            for (var i = 1; i < active.length; i++) {
+                if (active[i] !== active[i - 1] + 1) { isContiguous = false; break; }
+            }
+            if (active.length === 1) {
+                priceText = labels[active[0] - 1];
+            } else if (isContiguous) {
+                priceText = labels[active[0] - 1] + '\u2013' + labels[active[active.length - 1] - 1];
+            } else {
+                priceText = active.map(function(v) { return labels[v - 1]; }).join(', ');
+            }
+            btn.classList.add('filter-active');
         }
-        updateSliderUI();
+        label.textContent = priceText;
+    }
+
+    dd.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+        cb.addEventListener('change', function() {
+            updateToggle();
+            saveFiltersToSession();
+        });
+    });
+
+    // Clear button
+    dd.querySelector('.price-clear-btn').addEventListener('click', function(e) {
+        e.stopPropagation();
+        dd.querySelectorAll('input[type="checkbox"]').forEach(function(cb) { cb.checked = false; });
+        updateToggle();
         saveFiltersToSession();
     });
 
-    updateSliderUI();
+    // Apply button (just close)
+    dd.querySelector('.price-apply-btn').addEventListener('click', function(e) {
+        e.stopPropagation();
+        dd.classList.remove('open');
+    });
 
-    // Expose for save/restore
-    window._getPriceRange = function() { return { min: priceMin, max: priceMax }; };
-    window._setPriceRange = function(min, max) {
-        priceMin = min; priceMax = max;
-        updateSliderUI();
-    };
+    updateToggle();
+
     window._getActivePrices = getActivePrices;
+    window._getPriceRange = function() {
+        var active = getActivePrices();
+        if (!active.length) return { min: 1, max: 4 };
+        return { min: Math.min.apply(null, active), max: Math.max.apply(null, active) };
+    };
+    window._setPriceRange = function(min, max) {
+        dd.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+            var v = parseInt(cb.value);
+            cb.checked = v >= min && v <= max;
+        });
+        updateToggle();
+    };
 })();
 
-// Set default date/time to now
-(function () {
-    var now = new Date();
-    var yyyy = now.getFullYear();
-    var mm = String(now.getMonth() + 1).padStart(2, '0');
-    var dd = String(now.getDate()).padStart(2, '0');
-    document.getElementById('filter-date').value = yyyy + '-' + mm + '-' + dd;
-    var hh = String(now.getHours()).padStart(2, '0');
-    var mi = String(now.getMinutes()).padStart(2, '0');
-    document.getElementById('filter-time').value = hh + ':' + mi;
-})();
+// Date defaults to "Any date" (unset)
+function updateDateToggle() {
+    var dateVal = document.getElementById('filter-date').value;
+    var btn = document.getElementById('date-toggle');
+    var label = document.getElementById('date-display');
+    if (dateVal) {
+        label.textContent = dateVal;
+        btn.classList.add('filter-active');
+    } else {
+        label.textContent = 'Any date';
+        btn.classList.remove('filter-active');
+    }
+}
+updateDateToggle();
 
-// Date picker: open calendar on click
-document.getElementById('filter-date').addEventListener('click', function() {
-    try { this.showPicker(); } catch(e) {}
-});
+// Custom calendar date picker
+(function() {
+    var dateToggle = document.getElementById('date-toggle');
+    var dateDropdown = document.getElementById('date-dropdown');
+    var dateInput = document.getElementById('filter-date');
+    var viewYear, viewMonth; // currently displayed month
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+    function toISO(y, m, d) { return y + '-' + pad(m + 1) + '-' + pad(d); }
+
+    var MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    var DAY_NAMES = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+    function initView() {
+        if (dateInput.value) {
+            var parts = dateInput.value.split('-');
+            viewYear = parseInt(parts[0]);
+            viewMonth = parseInt(parts[1]) - 1;
+        } else {
+            var now = new Date();
+            viewYear = now.getFullYear();
+            viewMonth = now.getMonth();
+        }
+    }
+
+    function renderCalendar() {
+        var today = new Date();
+        var todayISO = toISO(today.getFullYear(), today.getMonth(), today.getDate());
+        var selectedISO = dateInput.value || '';
+
+        var html = '<div class="date-cal-header">';
+        html += '<button type="button" class="date-prev-btn"><span class="material-symbols-outlined">chevron_left</span></button>';
+        html += '<span class="date-cal-title">' + MONTH_NAMES[viewMonth] + ' ' + viewYear + '</span>';
+        html += '<button type="button" class="date-next-btn"><span class="material-symbols-outlined">chevron_right</span></button>';
+        html += '</div>';
+
+        html += '<div class="date-cal-weekdays">';
+        DAY_NAMES.forEach(function(d) { html += '<span>' + d + '</span>'; });
+        html += '</div>';
+
+        // Calculate first day of month and number of days
+        var firstDay = new Date(viewYear, viewMonth, 1).getDay();
+        var daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+        var daysInPrevMonth = new Date(viewYear, viewMonth, 0).getDate();
+
+        html += '<div class="date-cal-days">';
+
+        // Previous month trailing days
+        for (var p = firstDay - 1; p >= 0; p--) {
+            var prevDay = daysInPrevMonth - p;
+            var pm = viewMonth === 0 ? 11 : viewMonth - 1;
+            var py = viewMonth === 0 ? viewYear - 1 : viewYear;
+            var iso = toISO(py, pm, prevDay);
+            html += '<button type="button" class="date-cal-day other-month" data-date="' + iso + '">' + prevDay + '</button>';
+        }
+
+        // Current month days
+        for (var d = 1; d <= daysInMonth; d++) {
+            var iso = toISO(viewYear, viewMonth, d);
+            var cls = 'date-cal-day';
+            if (iso === todayISO) cls += ' today';
+            if (iso === selectedISO) cls += ' selected';
+            html += '<button type="button" class="' + cls + '" data-date="' + iso + '">' + d + '</button>';
+        }
+
+        // Next month leading days to fill grid
+        var totalCells = firstDay + daysInMonth;
+        var remaining = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+        for (var n = 1; n <= remaining; n++) {
+            var nm = viewMonth === 11 ? 0 : viewMonth + 1;
+            var ny = viewMonth === 11 ? viewYear + 1 : viewYear;
+            var iso = toISO(ny, nm, n);
+            html += '<button type="button" class="date-cal-day other-month" data-date="' + iso + '">' + n + '</button>';
+        }
+
+        html += '</div>';
+
+        html += '<div class="date-cal-footer">';
+        html += '<button type="button" class="btn-tertiary btn-s date-clear-btn">Clear</button>';
+        html += '<button type="button" class="btn-primary btn-s date-apply-btn">Apply</button>';
+        html += '</div>';
+
+        dateDropdown.innerHTML = html;
+    }
+
+    function setDateValue(iso) {
+        dateInput.value = iso;
+        updateDateToggle();
+        saveFiltersToSession();
+        renderCalendar();
+    }
+
+    // Event delegation for calendar clicks
+    dateDropdown.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var dayBtn = e.target.closest('.date-cal-day');
+        if (dayBtn) {
+            setDateValue(dayBtn.dataset.date);
+            return;
+        }
+        if (e.target.closest('.date-prev-btn')) {
+            viewMonth--;
+            if (viewMonth < 0) { viewMonth = 11; viewYear--; }
+            renderCalendar();
+            return;
+        }
+        if (e.target.closest('.date-next-btn')) {
+            viewMonth++;
+            if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+            renderCalendar();
+            return;
+        }
+        if (e.target.closest('.date-clear-btn')) {
+            dateInput.value = '';
+            updateDateToggle();
+            saveFiltersToSession();
+            initView();
+            renderCalendar();
+            return;
+        }
+        if (e.target.closest('.date-apply-btn')) {
+            dateDropdown.classList.remove('open');
+            return;
+        }
+    });
+
+    // Toggle dropdown
+    dateToggle.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var wasOpen = dateDropdown.classList.contains('open');
+        closeAllDropdowns();
+        if (!wasOpen) {
+            initView();
+            renderCalendar();
+            dateDropdown.classList.add('open');
+        }
+    });
+
+    // Outside click to close
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.date-wrapper')) {
+            dateDropdown.classList.remove('open');
+        }
+    });
+})();
 
 // Time dropdown
 (function() {
@@ -429,6 +583,13 @@ document.getElementById('filter-date').addEventListener('click', function() {
         return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
     }
 
+    // "Any time" option
+    var anySlot = document.createElement('div');
+    anySlot.className = 'time-slot';
+    anySlot.textContent = 'Any time';
+    anySlot.dataset.value = '';
+    timeDropdown.appendChild(anySlot);
+
     // Build single list of time slots
     for (var h = 0; h < 24; h++) {
         for (var m = 0; m < 60; m += 30) {
@@ -442,8 +603,15 @@ document.getElementById('filter-date').addEventListener('click', function() {
 
     function setTimeValue(val24) {
         timeInput.value = val24;
-        var parts = val24.split(':');
-        timeToggle.textContent = formatTime12(parseInt(parts[0]), parseInt(parts[1]));
+        var label = timeToggle.querySelector('.filter-label');
+        if (!val24) {
+            label.textContent = 'Any time';
+            timeToggle.classList.remove('filter-active');
+        } else {
+            var parts = val24.split(':');
+            label.textContent = formatTime12(parseInt(parts[0]), parseInt(parts[1]));
+            timeToggle.classList.add('filter-active');
+        }
         timeDropdown.querySelectorAll('.time-slot').forEach(function(s) {
             s.classList.toggle('active', s.dataset.value === val24);
         });
@@ -452,13 +620,18 @@ document.getElementById('filter-date').addEventListener('click', function() {
 
     function syncDisplay() {
         var val = timeInput.value;
-        if (val) {
+        var label = timeToggle.querySelector('.filter-label');
+        if (!val) {
+            label.textContent = 'Any time';
+            timeToggle.classList.remove('filter-active');
+        } else {
             var parts = val.split(':');
-            timeToggle.textContent = formatTime12(parseInt(parts[0]), parseInt(parts[1]));
-            timeDropdown.querySelectorAll('.time-slot').forEach(function(s) {
-                s.classList.toggle('active', s.dataset.value === val);
-            });
+            label.textContent = formatTime12(parseInt(parts[0]), parseInt(parts[1]));
+            timeToggle.classList.add('filter-active');
         }
+        timeDropdown.querySelectorAll('.time-slot').forEach(function(s) {
+            s.classList.toggle('active', s.dataset.value === val);
+        });
     }
     syncDisplay();
 
@@ -476,8 +649,12 @@ document.getElementById('filter-date').addEventListener('click', function() {
         if (!wasOpen) timeDropdown.classList.add('open');
         if (timeDropdown.classList.contains('open')) {
             var active = timeDropdown.querySelector('.time-slot.active');
-            if (active) {
+            if (active && active.dataset.value) {
                 active.scrollIntoView({ block: 'center' });
+            } else {
+                // Scroll to 5PM centered when no time selected
+                var slot5pm = timeDropdown.querySelector('.time-slot[data-value="17:00"]');
+                if (slot5pm) slot5pm.scrollIntoView({ block: 'center' });
             }
         }
     });
@@ -502,7 +679,6 @@ document.getElementById('filter-sort').addEventListener('change', function() {
         performSearch();
     }
 });
-document.getElementById('filter-date').addEventListener('change', saveFiltersToSession);
 
 // Notification system
 let notificationTimer = null;
@@ -515,9 +691,10 @@ function showNotification(message, type) {
     notificationTimer = setTimeout(() => { el.style.display = 'none'; }, 5000);
 }
 
-// Search button state
+// Search button state (filter bar button removed; pin popup button still exists)
 function updateSearchButtonState() {
     const btn = document.getElementById('search-btn');
+    if (!btn) return;
     if (isSearching) {
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner"></span>';
@@ -782,13 +959,13 @@ function renderCardDetails(index, details) {
 
     if (details.phone || r.phone) {
         const phone = details.phone || r.phone;
-        html += '<a class="detail-link" href="tel:' + escapeHtml(phone) + '"><span class="material-icons">call</span> ' + escapeHtml(phone) + '</a>';
+        html += '<a class="detail-link" href="tel:' + escapeHtml(phone) + '"><span class="material-symbols-outlined">call</span> ' + escapeHtml(phone) + '</a>';
     }
 
     if (details.website) {
         let domain = details.website;
         try { domain = new URL(details.website).hostname; } catch(e) {}
-        html += '<a class="detail-link" href="' + escapeHtml(details.website) + '" target="_blank" rel="noopener"><span class="material-icons">language</span> ' + escapeHtml(domain) + '</a>';
+        html += '<a class="detail-link" href="' + escapeHtml(details.website) + '" target="_blank" rel="noopener"><span class="material-symbols-outlined">language</span> ' + escapeHtml(domain) + '</a>';
     }
 
     html += '<a class="detail-link detail-link-primary" href="' + escapeHtml(r.source_url || '#') + '" target="_blank" rel="noopener">View on Google Maps</a>';
@@ -888,7 +1065,7 @@ function showSkeletonCards() {
 function showInitialEmptyState() {
     var container = document.getElementById('result-cards');
     container.innerHTML = '<div class="panel-empty-initial">' +
-        '<span class="material-icons" style="font-size:36px;color:#d1d5db;">location_on</span>' +
+        '<span class="material-symbols-outlined" style="font-size:36px;color:#d1d5db;">location_on</span>' +
         '<div>Drop a pin and search to find restaurants</div>' +
         '</div>';
 }
@@ -927,7 +1104,7 @@ function renderResultCards(results) {
             html += '</div>';
         }
         html += '</div>';
-        html += '<button type="button" class="card-map-btn" title="Show on map"><span class="material-icons">pin_drop</span></button>';
+        html += '<button type="button" class="card-map-btn" title="Show on map"><span class="material-symbols-outlined">pin_drop</span></button>';
         html += '</div>';
 
         html += '<div class="card-meta">';
@@ -1112,7 +1289,8 @@ async function performSearch() {
     }
 }
 
-document.getElementById('search-btn').addEventListener('click', performSearch);
+const searchBtnEl = document.getElementById('search-btn');
+if (searchBtnEl) searchBtnEl.addEventListener('click', performSearch);
 
 // Debug mode toggle
 const debugBtn = document.getElementById('debug-btn');
@@ -1142,7 +1320,9 @@ window.addEventListener('resize', function () { map.invalidateSize(); });
 // Radius dropdown in filter bar
 const RADIUS_PRESETS = [
     { label: '500m', value: 500 },
+    { label: '750m', value: 750 },
     { label: '1km', value: 1000 },
+    { label: '1.5km', value: 1500 },
     { label: '2km', value: 2000 },
     { label: '5km', value: 5000 }
 ];
@@ -1152,7 +1332,11 @@ function setRadius(value) {
     // Update toggle button text
     var toggleBtn = document.getElementById('radius-toggle');
     var preset = RADIUS_PRESETS.find(function(p) { return p.value === value; });
-    if (toggleBtn && preset) toggleBtn.textContent = preset.label;
+    if (toggleBtn && preset) {
+        var label = toggleBtn.querySelector('.filter-label');
+        if (label) label.textContent = preset.label;
+        toggleBtn.classList.add('filter-active');
+    }
     // Update active state in dropdown
     document.querySelectorAll('.radius-opt').forEach(function(b) {
         b.classList.toggle('active', parseInt(b.dataset.value) === value);
@@ -1247,7 +1431,7 @@ function showPinSearchPopup(lat, lng) {
         autoPan: false
     })
     .setLatLng([lat, lng])
-    .setContent('<button class="pin-search-btn" onclick="performSearch()">Search</button>')
+    .setContent('<button class="btn-primary pin-search-btn" onclick="performSearch()">Search</button>')
     .openOn(map);
 }
 
@@ -1264,8 +1448,8 @@ function placePin(lat, lng) {
 
     currentCircle = L.circle([lat, lng], {
         radius: selectedRadius,
-        color: '#3b82f6',
-        fillColor: '#3b82f6',
+        color: '#2358DA',
+        fillColor: '#2358DA',
         fillOpacity: 0.08,
         weight: 2
     }).addTo(map);
@@ -1315,6 +1499,10 @@ map.on('zoomend', function() {
 });
 
 map.on('click', function (e) {
+    if (anyDropdownOpen()) {
+        closeAllDropdowns();
+        return;
+    }
     placePin(e.latlng.lat, e.latlng.lng);
 });
 
@@ -1420,6 +1608,13 @@ document.addEventListener('keydown', function(e) {
             document.getElementById('price-toggle').focus();
             return;
         }
+        // Close date dropdown
+        var dateDD = document.getElementById('date-dropdown');
+        if (dateDD && dateDD.classList.contains('open')) {
+            dateDD.classList.remove('open');
+            document.getElementById('date-toggle').focus();
+            return;
+        }
         // Close time dropdown
         var timeDD = document.getElementById('time-dropdown');
         if (timeDD && timeDD.classList.contains('open')) {
@@ -1457,5 +1652,26 @@ document.addEventListener('keydown', function(e) {
         }
     }
 });
+
+// Filter bar bounce animation on resize
+(function() {
+    var bar = document.getElementById('filter-bar');
+    var lastWidth = bar.offsetWidth;
+    var observer = new ResizeObserver(function(entries) {
+        var newWidth = entries[0].contentRect.width;
+        if (lastWidth > 0 && Math.abs(newWidth - lastWidth) > 2) {
+            var ratio = lastWidth / newWidth;
+            bar.animate([
+                { transform: 'translateX(-50%) scaleX(' + ratio + ')' },
+                { transform: 'translateX(-50%) scaleX(1)' }
+            ], {
+                duration: 400,
+                easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)'
+            });
+        }
+        lastWidth = newWidth;
+    });
+    observer.observe(bar);
+})();
 
 // Panel starts hidden — only shown when search returns results

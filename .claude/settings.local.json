@@ -20,7 +20,9 @@
       "Bash(gh *)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:developers.google.com)",
-      "mcp__Claude_Preview__preview_start"
+      "mcp__Claude_Preview__preview_start",
+      "mcp__figma-mcp__add_figma_file",
+      "mcp__figma-mcp__view_node"
     ]
   }
 }

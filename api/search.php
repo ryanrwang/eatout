@@ -80,6 +80,19 @@ if ($openAt < 0) {
     exit;
 }
 
+// Load cache and check daily limit
+require __DIR__ . '/cache.php';
+
+if (!apiUsageRecord('search')) {
+    http_response_code(429);
+    echo json_encode([
+        'error'   => 'Daily API limit reached',
+        'message' => 'The daily limit of ' . DAILY_API_LIMIT . ' API calls has been reached. Try again tomorrow.',
+        'usage'   => ['today' => apiUsageToday(), 'limit' => DAILY_API_LIMIT],
+    ]);
+    exit;
+}
+
 // Load providers
 require_once __DIR__ . '/providers/ProviderInterface.php';
 require_once __DIR__ . '/providers/GooglePlacesProvider.php';
@@ -143,4 +156,5 @@ echo json_encode([
     'results'        => $allResults,
     'rate_limit'     => $rateLimit,
     'provider_count' => $providerCount,
+    'usage'          => ['today' => apiUsageToday(), 'limit' => DAILY_API_LIMIT],
 ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);

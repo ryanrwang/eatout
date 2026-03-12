@@ -8,7 +8,8 @@ let pinLat = null;
 let pinLng = null;
 let resultMarkers = [];
 let isSearching = false;
-let apiCallCount = parseInt(localStorage.getItem('eatout_api_calls') || '0', 10);
+let apiCallCount = 0;
+let apiDailyLimit = 100;
 let panelOpen = false;
 let searchResults = [];
 let activeCardIndex = -1;
@@ -145,8 +146,21 @@ const MOCK_DETAILS = {
 
 // Update API counter display
 function updateApiCounter() {
-    document.getElementById('api-counter').textContent = 'API calls: ' + apiCallCount;
+    document.getElementById('api-counter').textContent = 'API: ' + apiCallCount + ' / ' + apiDailyLimit;
 }
+function updateUsageFromResponse(data) {
+    if (data && data.usage) {
+        apiCallCount = data.usage.today;
+        apiDailyLimit = data.usage.limit;
+        updateApiCounter();
+    }
+}
+// Fetch global usage count on page load
+fetch('api/usage.php').then(r => r.json()).then(data => {
+    apiCallCount = data.today;
+    apiDailyLimit = data.limit;
+    updateApiCounter();
+}).catch(() => {});
 updateApiCounter();
 
 // Cuisine data
@@ -794,12 +808,18 @@ function updatePanelCount() {
     el.textContent = n + (n === 1 ? ' restaurant' : ' restaurants');
 }
 
-// Update results panel top to sit below filter bar
+// Update results panel top — sit at 12px when filter bar doesn't overlap, else below it
 function updatePanelTop() {
     var panel = document.getElementById('results-panel');
     if (panel.style.display === 'none' || isMobile()) return;
     var filterBar = document.getElementById('filter-bar');
-    panel.style.top = (12 + filterBar.offsetHeight + 8) + 'px';
+    var filterRect = filterBar.getBoundingClientRect();
+    var panelRight = 12 + 360; // left + width
+    if (filterRect.left >= panelRight) {
+        panel.style.top = '12px';
+    } else {
+        panel.style.top = (12 + filterBar.offsetHeight + 8) + 'px';
+    }
 }
 
 // Center pin in visible map area (accounts for panel on desktop)
@@ -851,10 +871,15 @@ function showResultsPanel() {
         return;
     }
 
-    // Dynamically position below filter bar
+    // Position: at top when filter bar doesn't overlap, else below it
     var filterBar = document.getElementById('filter-bar');
-    var filterHeight = filterBar.offsetHeight;
-    panel.style.top = (12 + filterHeight + 8) + 'px';
+    var filterRect = filterBar.getBoundingClientRect();
+    var panelRight = 12 + 360;
+    if (filterRect.left >= panelRight) {
+        panel.style.top = '12px';
+    } else {
+        panel.style.top = (12 + filterBar.offsetHeight + 8) + 'px';
+    }
 
     panel.style.display = 'flex';
     panel.offsetHeight; // force reflow
@@ -1063,14 +1088,7 @@ async function toggleCardExpansion(index) {
     try {
         const data = await fetchDetails(r.source_id);
         detailsCache[r.source_id] = data;
-
-        apiCallCount++;
-        localStorage.setItem('eatout_api_calls', String(apiCallCount));
-        updateApiCounter();
-
-        if (apiCallCount > 100) {
-            showNotification('API usage is high (' + apiCallCount + ' calls). Consider limiting searches.', 'info');
-        }
+        updateUsageFromResponse(data);
 
         if (expandedCardIndex === index) {
             detail.innerHTML = '<div class="card-detail-inner">' + renderCardDetails(index, data) + '</div>';
@@ -1281,11 +1299,6 @@ async function performSearch() {
         return;
     }
 
-    // Increment API counter
-    apiCallCount++;
-    localStorage.setItem('eatout_api_calls', String(apiCallCount));
-    updateApiCounter();
-
     // Build params
     const params = new URLSearchParams();
     params.set('latitude', pinLat);
@@ -1310,8 +1323,9 @@ async function performSearch() {
     try {
         const resp = await fetch('api/search.php?' + params.toString());
         const data = await resp.json();
+        updateUsageFromResponse(data);
         if (!resp.ok) {
-            showNotification(data.error || 'Search failed (' + resp.status + ')', 'error');
+            showNotification(data.message || data.error || 'Search failed (' + resp.status + ')', 'error');
         } else {
             let results = data.results;
 
@@ -1354,7 +1368,7 @@ L.control.zoom({ position: 'bottomright' }).addTo(map);
 
 map.doubleClickZoom.enable();
 
-window.addEventListener('resize', function () { map.invalidateSize(); });
+window.addEventListener('resize', function () { map.invalidateSize(); updatePanelTop(); });
 
 // Radius dropdown in filter bar
 const RADIUS_PRESETS = [
@@ -1766,25 +1780,31 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
-// Filter bar bounce animation on resize
+// Swoop in filter bar after page load, then start resize observer
 (function() {
     var bar = document.getElementById('filter-bar');
-    var lastWidth = bar.offsetWidth;
-    var observer = new ResizeObserver(function(entries) {
-        var newWidth = entries[0].contentRect.width;
-        if (lastWidth > 0 && Math.abs(newWidth - lastWidth) > 2) {
-            var ratio = lastWidth / newWidth;
-            bar.animate([
-                { transform: 'translateX(-50%) scaleX(' + ratio + ')' },
-                { transform: 'translateX(-50%) scaleX(1)' }
-            ], {
-                duration: 400,
-                easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)'
-            });
-        }
-        lastWidth = newWidth;
-    });
-    observer.observe(bar);
+    setTimeout(function() {
+        bar.classList.add('swooped-in');
+
+        // Start resize bounce observer after swoop-in finishes
+        var lastWidth = bar.offsetWidth;
+        var observer = new ResizeObserver(function(entries) {
+            var newWidth = entries[0].contentRect.width;
+            if (lastWidth > 0 && Math.abs(newWidth - lastWidth) > 2) {
+                var ratio = lastWidth / newWidth;
+                bar.animate([
+                    { transform: 'translateX(-50%) scaleX(' + ratio + ')' },
+                    { transform: 'translateX(-50%) scaleX(1)' }
+                ], {
+                    duration: 400,
+                    easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)'
+                });
+            }
+            lastWidth = newWidth;
+        });
+        // Delay observer start until transition completes
+        setTimeout(function() { observer.observe(bar); }, 700);
+    }, 1200);
 })();
 
 // Panel starts hidden — only shown when search returns results

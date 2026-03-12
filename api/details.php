@@ -50,10 +50,22 @@ if (!$fresh) {
     if ($cachedJson !== null) {
         $cachedData = json_decode($cachedJson, true);
         $cachedData['cached'] = true;
+        $cachedData['usage'] = ['today' => apiUsageToday(), 'limit' => DAILY_API_LIMIT];
         cacheCleanup();
         echo json_encode($cachedData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         exit;
     }
+}
+
+// Check daily limit before making an API call
+if (!apiUsageRecord('details')) {
+    http_response_code(429);
+    echo json_encode([
+        'error'   => 'Daily API limit reached',
+        'message' => 'The daily limit of ' . DAILY_API_LIMIT . ' API calls has been reached. Try again tomorrow.',
+        'usage'   => ['today' => apiUsageToday(), 'limit' => DAILY_API_LIMIT],
+    ]);
+    exit;
 }
 
 // Call Google Places API (New) - Place Details
@@ -127,6 +139,7 @@ $result = [
     'address' => $data['formattedAddress'] ?? '',
     'website' => $data['websiteUri'] ?? null,
     'cached'  => false,
+    'usage'   => ['today' => apiUsageToday(), 'limit' => DAILY_API_LIMIT],
 ];
 
 // Store in cache

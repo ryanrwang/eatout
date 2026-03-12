@@ -7,6 +7,7 @@ define('CACHE_DB', CACHE_DIR . '/cache.db');
 define('PHOTO_DIR', CACHE_DIR . '/photos');
 define('DETAIL_TTL', 21600);  // 6 hours
 define('PHOTO_TTL', 86400);   // 24 hours
+define('DAILY_API_LIMIT', 100);
 
 /**
  * Get or create the SQLite database connection.
@@ -26,6 +27,12 @@ function cacheDb(): PDO
         place_id TEXT PRIMARY KEY,
         response_json TEXT NOT NULL,
         cached_at INTEGER NOT NULL
+    )');
+
+    $pdo->exec('CREATE TABLE IF NOT EXISTS api_usage (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        endpoint TEXT NOT NULL,
+        called_at TEXT NOT NULL DEFAULT (date(\'now\'))
     )');
 
     return $pdo;
@@ -97,6 +104,33 @@ function photoCacheSet(string $name, int $maxWidth, string $bytes, string $conte
 }
 
 /**
+ * Get today's API call count.
+ */
+function apiUsageToday(): int
+{
+    $pdo = cacheDb();
+    $stmt = $pdo->prepare('SELECT COUNT(*) FROM api_usage WHERE called_at = date(\'now\')');
+    $stmt->execute();
+    return (int) $stmt->fetchColumn();
+}
+
+/**
+ * Record an API call and return true if under the daily limit, false if over.
+ */
+function apiUsageRecord(string $endpoint): bool
+{
+    $count = apiUsageToday();
+    if ($count >= DAILY_API_LIMIT) {
+        return false;
+    }
+
+    $pdo = cacheDb();
+    $stmt = $pdo->prepare('INSERT INTO api_usage (endpoint, called_at) VALUES (?, date(\'now\'))');
+    $stmt->execute([$endpoint]);
+    return true;
+}
+
+/**
  * Delete expired cache entries. Called probabilistically (1 in 50 requests).
  */
 function cacheCleanup(): void
@@ -118,4 +152,7 @@ function cacheCleanup(): void
             unlink($filePath);
         }
     }
+
+    // Clean old API usage (older than 30 days)
+    $pdo->prepare('DELETE FROM api_usage WHERE called_at < date(\'now\', \'-30 days\')')->execute();
 }

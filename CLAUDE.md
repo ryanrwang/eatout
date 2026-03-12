@@ -1,5 +1,6 @@
 ## Environment
-- `gh` CLI is installed at `/c/Program Files/GitHub CLI/gh.exe` — use this full path since it's not on the bash PATH.
+- **Mac:** `gh` CLI is installed via Homebrew at `/opt/homebrew/bin/gh`.
+- **Windows:** `gh` CLI is installed at `/c/Program Files/GitHub CLI/gh.exe` — use this full path since it's not on the bash PATH.
 
 ## Repo Hygiene
 

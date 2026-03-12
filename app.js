@@ -3,7 +3,7 @@ let currentMarker = null;
 let currentCircle = null;
 let radarMarker = null;
 let pinSearchPopup = null;
-let selectedRadius = 1000;
+let selectedRadius = 500;
 let pinLat = null;
 let pinLng = null;
 let resultMarkers = [];
@@ -254,6 +254,10 @@ function saveFiltersToSession() {
     sessionStorage.setItem('eatout_filters', JSON.stringify({
         cuisines: cuisines, priceRange: priceRange, sort: sort, date: date, time: time, radius: selectedRadius
     }));
+    // Show search button if results are stale due to filter change
+    if (searchResults.length > 0 && pinLat !== null && !pinSearchPopup) {
+        showPinSearchPopup(pinLat, pinLng);
+    }
 }
 
 function restoreFiltersFromSession() {
@@ -798,6 +802,25 @@ function updatePanelTop() {
     panel.style.top = (12 + filterBar.offsetHeight + 8) + 'px';
 }
 
+// Center pin in visible map area (accounts for panel on desktop)
+function centerPinOnMap() {
+    if (pinLat === null) return;
+    if (isMobile()) {
+        map.panTo([pinLat, pinLng], { animate: true, duration: 0.3 });
+        return;
+    }
+    var panelWidth = panelOpen ? 384 : 0;
+    var mapSize = map.getSize();
+    var visibleCenterX = panelWidth + (mapSize.x - panelWidth) / 2;
+    var visibleCenterY = mapSize.y / 2;
+    var pinPoint = map.latLngToContainerPoint([pinLat, pinLng]);
+    var dx = pinPoint.x - visibleCenterX;
+    var dy = pinPoint.y - visibleCenterY;
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+        map.panBy([dx, dy], { animate: true, duration: 0.3 });
+    }
+}
+
 // Panel show/hide with floating animation
 function showResultsPanel() {
     var panel = document.getElementById('results-panel');
@@ -839,8 +862,8 @@ function showResultsPanel() {
     panelOpen = true;
     updatePanelCount();
 
-    // Shift map center to account for panel
-    map.panBy([180, 0], { animate: true, duration: 0.3 });
+    // Center pin in visible area right of panel
+    centerPinOnMap();
 }
 
 function hideResultsPanel() {
@@ -860,8 +883,8 @@ function hideResultsPanel() {
     // Desktop behavior
     panel.classList.remove('visible');
     panelOpen = false;
-    // Shift map center back
-    map.panBy([-180, 0], { animate: true, duration: 0.3 });
+    // Center pin back in full map
+    centerPinOnMap();
     setTimeout(function() {
         if (!panelOpen) panel.style.display = 'none';
     }, 320);
@@ -871,25 +894,38 @@ function hideResultsPanel() {
 function highlightMarker(index) {
     if (index < 0 || index >= resultMarkers.length) return;
     const marker = resultMarkers[index];
-    const icon = L.divIcon({
-        className: '',
-        html: '<div class="result-marker highlighted">' + (index + 1) + '</div>',
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
-    });
-    marker.setIcon(icon);
+    const el = marker.getElement();
+    if (el) {
+        const dot = el.querySelector('.result-marker');
+        if (dot) {
+            dot.classList.remove('bounce-out');
+            dot.classList.add('highlighted', 'bounce-in');
+        }
+    }
+    // Also bounce the card number in the panel
+    const cardNum = document.querySelector('.result-card[data-index="' + index + '"] .card-number');
+    if (cardNum) {
+        cardNum.classList.remove('bounce-out');
+        cardNum.classList.add('bounce-in');
+    }
 }
 
 function unhighlightMarker(index) {
     if (index < 0 || index >= resultMarkers.length) return;
     const marker = resultMarkers[index];
-    const icon = L.divIcon({
-        className: '',
-        html: '<div class="result-marker">' + (index + 1) + '</div>',
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
-    });
-    marker.setIcon(icon);
+    const el = marker.getElement();
+    if (el) {
+        const dot = el.querySelector('.result-marker');
+        if (dot) {
+            dot.classList.remove('highlighted', 'bounce-in');
+            dot.classList.add('bounce-out');
+        }
+    }
+    const cardNum = document.querySelector('.result-card[data-index="' + index + '"] .card-number');
+    if (cardNum) {
+        cardNum.classList.remove('bounce-in');
+        cardNum.classList.add('bounce-out');
+    }
 }
 
 function scrollToCard(index) {
@@ -1187,6 +1223,9 @@ function displayResults(results) {
         html += '</div>';
         marker.bindPopup(html);
 
+        marker.on('mouseover', () => highlightMarker(i));
+        marker.on('mouseout', () => unhighlightMarker(i));
+
         marker.on('click', () => {
             if (panelOpen) scrollToCard(i);
             else {
@@ -1427,7 +1466,7 @@ function showPinSearchPopup(lat, lng) {
     pinSearchPopup = L.popup({
         className: 'pin-search-popup',
         closeButton: false,
-        offset: [0, 68],
+        offset: [0, 85],
         autoPan: false
     })
     .setLatLng([lat, lng])
@@ -1461,9 +1500,74 @@ function placePin(lat, lng) {
         iconAnchor: [8, 8],
     });
     currentMarker = L.marker([lat, lng], { draggable: true, icon: pinIcon }).addTo(map);
+    var dragTarget = null;
+    var dragAnimId = null;
+    var circlePos = null;
+    function lerpDrag() {
+        if (!dragTarget || !circlePos) return;
+        circlePos.lat += (dragTarget.lat - circlePos.lat) * 0.3;
+        circlePos.lng += (dragTarget.lng - circlePos.lng) * 0.3;
+        currentCircle.setLatLng([circlePos.lat, circlePos.lng]);
+        if (radarMarker) radarMarker.setLatLng([circlePos.lat, circlePos.lng]);
+        var dist = Math.abs(dragTarget.lat - circlePos.lat) + Math.abs(dragTarget.lng - circlePos.lng);
+        if (dist > 1e-8) {
+            dragAnimId = requestAnimationFrame(lerpDrag);
+        } else {
+            currentCircle.setLatLng([dragTarget.lat, dragTarget.lng]);
+            if (radarMarker) radarMarker.setLatLng([dragTarget.lat, dragTarget.lng]);
+            dragAnimId = null;
+        }
+    }
+    currentMarker.on('dragstart', function () {
+        var pos = currentMarker.getLatLng();
+        circlePos = { lat: pos.lat, lng: pos.lng };
+        if (pinSearchPopup) {
+            var el = pinSearchPopup.getElement();
+            if (el) { el.style.transition = 'opacity 0.15s'; el.style.opacity = '0'; }
+        }
+    });
+    currentMarker.on('drag', function (e) {
+        var pos = e.target.getLatLng();
+        dragTarget = { lat: pos.lat, lng: pos.lng };
+        if (pinSearchPopup) pinSearchPopup.setLatLng(pos);
+        if (!dragAnimId) dragAnimId = requestAnimationFrame(lerpDrag);
+    });
     currentMarker.on('dragend', function (e) {
         const pos = e.target.getLatLng();
+        dragTarget = { lat: pos.lat, lng: pos.lng };
+        if (!dragAnimId) dragAnimId = requestAnimationFrame(lerpDrag);
         updatePin(pos.lat, pos.lng);
+        if (pinSearchPopup) {
+            var el = pinSearchPopup.getElement();
+            if (el) { el.style.transition = 'opacity 0.15s'; el.style.opacity = '1'; }
+        }
+    });
+    currentMarker.on('mouseover', function () {
+        var el = currentMarker.getElement();
+        if (el) {
+            var dot = el.querySelector('.pin-dot');
+            if (dot) { dot.classList.remove('bounce-out'); dot.classList.add('bounce-in'); }
+        }
+        if (currentCircle) {
+            var pathEl = currentCircle.getElement();
+            if (pathEl) {
+                pathEl.style.transition = 'stroke-width 0.2s ease';
+                pathEl.style.strokeWidth = '4';
+            }
+        }
+    });
+    currentMarker.on('mouseout', function () {
+        var el = currentMarker.getElement();
+        if (el) {
+            var dot = el.querySelector('.pin-dot');
+            if (dot) { dot.classList.remove('bounce-in'); dot.classList.add('bounce-out'); }
+        }
+        if (currentCircle) {
+            var pathEl = currentCircle.getElement();
+            if (pathEl) {
+                pathEl.style.strokeWidth = '2';
+            }
+        }
     });
 
     updateRadar(lat, lng);
@@ -1498,7 +1602,16 @@ map.on('zoomend', function() {
     }
 });
 
+let justClosedPopup = false;
+map.on('popupclose', function(e) {
+    // Only block pin placement when a result marker popup closes, not the pin search popup
+    if (e.popup === pinSearchPopup) return;
+    justClosedPopup = true;
+    setTimeout(function() { justClosedPopup = false; }, 10);
+});
+
 map.on('click', function (e) {
+    if (justClosedPopup) return;
     if (anyDropdownOpen()) {
         closeAllDropdowns();
         return;

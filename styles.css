@@ -760,6 +760,30 @@ html, body { width: 100%; height: 100%; }
     box-shadow: 0 0 0 4px rgba(var(--primary-rgb),0.4), 0 2px 4px rgba(0,0,0,0.3);
 }
 
+/* Bounce animations for pins */
+.result-marker.bounce-in {
+    animation: pin-bounce-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+.result-marker.bounce-out {
+    animation: pin-bounce-out 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+.card-number.bounce-in {
+    animation: pin-bounce-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+.card-number.bounce-out {
+    animation: pin-bounce-out 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes pin-bounce-in {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.5); }
+    100% { transform: scale(1.35); }
+}
+@keyframes pin-bounce-out {
+    0% { transform: scale(1.35); }
+    50% { transform: scale(0.9); }
+    100% { transform: scale(1); }
+}
+
 /* Pin dot (replaces default Leaflet marker) */
 .pin-dot {
     width: 16px;
@@ -771,6 +795,22 @@ html, body { width: 100%; height: 100%; }
     cursor: grab;
 }
 .pin-dot:active { cursor: grabbing; }
+.pin-dot.bounce-in {
+    animation: center-pin-bounce-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+.pin-dot.bounce-out {
+    animation: center-pin-bounce-out 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes center-pin-bounce-in {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.7); }
+    100% { transform: scale(1.5); }
+}
+@keyframes center-pin-bounce-out {
+    0% { transform: scale(1.5); }
+    50% { transform: scale(0.9); }
+    100% { transform: scale(1); }
+}
 
 /* Radar pulse rings */
 .radar-container {
@@ -785,21 +825,25 @@ html, body { width: 100%; height: 100%; }
     border-radius: 50%;
     border: 2px solid rgba(var(--primary-rgb), 0.3);
     background: rgba(var(--primary-rgb), 0.04);
-    animation: radar-pulse 3s ease-out infinite;
+    animation: radar-pulse 5s ease-out infinite;
+    opacity: 0;
 }
-.radar-ring:nth-child(2) { animation-delay: 1s; }
-.radar-ring:nth-child(3) { animation-delay: 2s; }
+.radar-ring:nth-child(2) { animation-delay: 0.5s; }
+.radar-ring:nth-child(3) { animation-delay: 1.0s; }
 @keyframes radar-pulse {
     0% { transform: translate(-50%, -50%) scale(0); opacity: 0.8; }
+    40% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
     100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
 }
 
 /* Pin search popup — below pin, no arrow */
 .pin-search-popup .leaflet-popup-tip-container { display: none; }
 .pin-search-popup .leaflet-popup-content-wrapper {
+    background: transparent;
+    border: none;
     border-radius: 16px;
     padding: 0;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    box-shadow: none;
 }
 .pin-search-popup .leaflet-popup-content {
     margin: 0;

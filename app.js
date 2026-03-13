@@ -222,6 +222,7 @@ cuisineTypes.forEach(c => {
         });
         updateCuisineToggle();
         saveFiltersToSession();
+        applyFilters();
     });
 
     var applyBtn = document.createElement('button');
@@ -231,6 +232,7 @@ cuisineTypes.forEach(c => {
     applyBtn.addEventListener('click', function(e) {
         e.stopPropagation();
         cuisineDropdown.classList.remove('open');
+        applyFilters();
     });
 
     footer.appendChild(clearBtn);
@@ -285,10 +287,37 @@ function hasActiveFilters() {
     return cuisines || prices || date || time || radius;
 }
 
+// Animate a filter bar button in/out
+function showFilterBtn(btn, show) {
+    if (!btn) return;
+    var isVisible = btn.style.display !== 'none';
+    if (show && !isVisible) {
+        btn.classList.add('entering');
+        btn.style.display = '';
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() {
+                btn.classList.remove('entering');
+            });
+        });
+    } else if (!show && isVisible) {
+        btn.classList.add('entering');
+        btn.addEventListener('transitionend', function handler() {
+            btn.removeEventListener('transitionend', handler);
+            btn.style.display = 'none';
+            btn.classList.remove('entering');
+        }, { once: true });
+        // Fallback in case transitionend doesn't fire
+        setTimeout(function() {
+            btn.style.display = 'none';
+            btn.classList.remove('entering');
+        }, 300);
+    }
+}
+
 function updateResetButton() {
     var btn = document.getElementById('filter-reset');
     if (!btn) return;
-    btn.classList.toggle('active', hasActiveFilters());
+    showFilterBtn(btn, hasActiveFilters());
 }
 
 function resetAllFilters() {
@@ -459,12 +488,14 @@ document.addEventListener('click', function(e) {
         dd.querySelectorAll('input[type="checkbox"]').forEach(function(cb) { cb.checked = false; });
         updateToggle();
         saveFiltersToSession();
+        applyFilters();
     });
 
-    // Apply button (just close)
+    // Apply button
     dd.querySelector('.price-apply-btn').addEventListener('click', function(e) {
         e.stopPropagation();
         dd.classList.remove('open');
+        applyFilters();
     });
 
     updateToggle();
@@ -616,12 +647,14 @@ updateDateToggle();
             dateInput.value = '';
             updateDateToggle();
             saveFiltersToSession();
+            applyFilters();
             initView();
             renderCalendar();
             return;
         }
         if (e.target.closest('.date-apply-btn')) {
             dateDropdown.classList.remove('open');
+            applyFilters();
             return;
         }
     });
@@ -719,6 +752,7 @@ updateDateToggle();
         if (!slot) return;
         setTimeValue(slot.dataset.value);
         timeDropdown.classList.remove('open');
+        applyFilters();
     });
 
     timeToggle.addEventListener('click', function(e) {
@@ -771,16 +805,23 @@ function showNotification(message, type) {
     notificationTimer = setTimeout(() => { el.style.display = 'none'; }, 5000);
 }
 
-// Search button state (filter bar button removed; pin popup button still exists)
+// Search button state
 function updateSearchButtonState() {
     const btn = document.getElementById('search-btn');
-    if (!btn) return;
-    if (isSearching) {
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner"></span>';
-    } else {
-        btn.disabled = pinLat === null;
-        btn.textContent = 'Search';
+    if (btn) {
+        if (isSearching) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>';
+        } else {
+            btn.disabled = pinLat === null;
+            btn.textContent = 'Search';
+        }
+    }
+    // Filter bar icon-only search button
+    const filterBtn = document.getElementById('filter-search');
+    if (filterBtn) {
+        showFilterBtn(filterBtn, pinLat !== null);
+        filterBtn.disabled = isSearching;
     }
 }
 
@@ -1208,7 +1249,7 @@ function renderResultCards(results) {
         const stars = '\u2605'.repeat(Math.round(r.rating || 0));
         const price = r.price_level ? '$'.repeat(r.price_level) : '';
         const dist = (pinLat !== null) ? formatDistance(pinLat, pinLng, r.latitude, r.longitude) : '';
-        const tags = (r.cuisine_tags || []).slice(0, 3).map(t => '<span class="card-tag">' + escapeHtml(friendlyCuisine(t)) + '</span>').join('');
+        const tags = (r.cuisine_tags || []).filter(t => t !== 'restaurant').slice(0, 3).map(t => '<span class="card-tag">' + escapeHtml(friendlyCuisine(t)) + '</span>').join('');
 
         let html = '<div class="card-header">';
         html += '<button type="button" class="card-number card-map-trigger" title="Show on map">' + (i + 1) + '</button>';
@@ -1282,32 +1323,46 @@ function displayResults(results) {
     }
 
     results.forEach((r, i) => {
+        const stars = '\u2605'.repeat(Math.round(r.rating || 0));
+        const price = '$'.repeat(r.price_level || 0);
+
+        // Build details HTML for expanded label
+        let detailsHtml = '';
+        if (r.rating) {
+            detailsHtml += '<div class="meta"><span class="stars">' + stars + '</span> ' +
+                    r.rating + (r.review_count ? ' (' + r.review_count + ')' : '') + '</div>';
+        }
+        if (price) detailsHtml += '<div class="meta">' + price + '</div>';
+        if (r.address) detailsHtml += '<div class="meta">' + escapeHtml(r.address) + '</div>';
+        if (r.source_url) detailsHtml += '<a href="' + escapeHtml(r.source_url) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">View on Google Maps</a>';
+
+        const labelHtml = '<div class="result-marker-label">' +
+            '<div class="result-marker-name">' + escapeHtml(r.name) + '</div>' +
+            '<div class="result-marker-details">' + detailsHtml + '</div>' +
+            '</div>';
+
         const icon = L.divIcon({
             className: '',
-            html: '<div class="result-marker">' + (i + 1) + '</div>',
+            html: '<div class="result-marker-wrap">' + labelHtml + '<div class="result-marker">' + (i + 1) + '</div></div>',
             iconSize: [24, 24],
             iconAnchor: [12, 12],
         });
         const marker = L.marker([r.latitude, r.longitude], { icon: icon }).addTo(map);
 
-        const stars = '\u2605'.repeat(Math.round(r.rating || 0));
-        const price = '$'.repeat(r.price_level || 0);
-        let html = '<div class="result-popup">';
-        html += '<h3>' + (i + 1) + '. ' + escapeHtml(r.name) + '</h3>';
-        if (r.rating) {
-            html += '<div class="meta"><span class="stars">' + stars + '</span> ' +
-                    r.rating + (r.review_count ? ' (' + r.review_count + ')' : '') + '</div>';
-        }
-        if (price) html += '<div class="meta">' + price + '</div>';
-        if (r.address) html += '<div class="meta">' + escapeHtml(r.address) + '</div>';
-        if (r.source_url) html += '<a href="' + escapeHtml(r.source_url) + '" target="_blank" rel="noopener">View on Google Maps</a>';
-        html += '</div>';
-        marker.bindPopup(html);
-
-        marker.on('mouseover', () => highlightMarker(i));
-        marker.on('mouseout', () => unhighlightMarker(i));
+        marker.on('mouseover', () => { highlightMarker(i); if (typeof setCursorLabel !== 'undefined') { hoveringPin = true; setCursorLabel('details'); } });
+        marker.on('mouseout', () => { unhighlightMarker(i); if (typeof hoveringPin !== 'undefined') { hoveringPin = false; setCursorLabel('drop'); } });
 
         marker.on('click', () => {
+            const el = marker.getElement();
+            const lbl = el ? el.querySelector('.result-marker-label') : null;
+            if (lbl) {
+                const wasExpanded = lbl.classList.contains('expanded');
+                // Collapse any other expanded label first
+                document.querySelectorAll('.result-marker-label.expanded').forEach(l => l.classList.remove('expanded'));
+                if (!wasExpanded) {
+                    lbl.classList.add('expanded');
+                }
+            }
             if (panelOpen) scrollToCard(i);
             else {
                 showResultsPanel();
@@ -1423,6 +1478,13 @@ function filterResults(results) {
     });
 }
 
+// Re-filter and display existing results (no API call)
+function applyFilters() {
+    if (searchResults.length > 0) {
+        displayResults(filterResults(searchResults));
+    }
+}
+
 // Perform search
 async function performSearch() {
     if (pinLat === null || isSearching) return;
@@ -1485,9 +1547,7 @@ async function performSearch() {
     params.set('sort_by', document.getElementById('filter-sort').value);
     params.set('limit', '20');
 
-    const selectedCuisines = Array.from(cuisineDropdown.querySelectorAll('input:checked')).map(cb => cb.value);
-    if (selectedCuisines.length > 0) params.set('categories', selectedCuisines.join(','));
-    // Price, date/time are filtered client-side using opening_periods data
+    // All filters (cuisine, price, date/time) are applied client-side
 
     try {
         const resp = await fetch('api/search.php?' + params.toString());
@@ -1661,7 +1721,7 @@ function showPinSearchPopup(lat, lng) {
         autoPan: false
     })
     .setLatLng([lat, lng])
-    .setContent('<button class="btn-primary pin-search-btn" onclick="performSearch()">Search</button>' + debugLabel)
+    .setContent('<button class="btn-primary pin-search-btn" onclick="performSearch()"><span class="btn-icon"><span class="material-symbols-outlined">search</span></span>Search</button>' + debugLabel)
     .openOn(map);
 }
 
@@ -1716,6 +1776,7 @@ function placePin(lat, lng) {
             var el = pinSearchPopup.getElement();
             if (el) { el.style.transition = 'opacity 0.15s'; el.style.opacity = '0'; }
         }
+        if (!isTouch && typeof setCursorLabel !== 'undefined') setCursorLabel('');
     });
     currentMarker.on('drag', function (e) {
         var pos = e.target.getLatLng();
@@ -1732,8 +1793,12 @@ function placePin(lat, lng) {
             var el = pinSearchPopup.getElement();
             if (el) { el.style.transition = 'opacity 0.15s'; el.style.opacity = '1'; }
         }
+        if (!isTouch && typeof setCursorLabel !== 'undefined') {
+            hoveringPin = true;
+            setCursorLabel('drag');
+        }
     });
-    currentMarker.on('mouseover', function () {
+    currentMarker.on('mouseover', function (e) {
         var el = currentMarker.getElement();
         if (el) {
             var dot = el.querySelector('.pin-dot');
@@ -1745,6 +1810,10 @@ function placePin(lat, lng) {
                 pathEl.style.transition = 'stroke-width 0.2s ease';
                 pathEl.style.strokeWidth = '4';
             }
+        }
+        if (!isTouch && typeof hoveringPin !== 'undefined') {
+            hoveringPin = true;
+            setCursorLabel('drag');
         }
     });
     currentMarker.on('mouseout', function () {
@@ -1758,6 +1827,10 @@ function placePin(lat, lng) {
             if (pathEl) {
                 pathEl.style.strokeWidth = '2';
             }
+        }
+        if (!isTouch && typeof hoveringPin !== 'undefined') {
+            hoveringPin = false;
+            setCursorLabel('drop');
         }
     });
 
@@ -1802,6 +1875,8 @@ map.on('popupclose', function(e) {
 });
 
 map.on('click', function (e) {
+    // Collapse any expanded marker labels
+    document.querySelectorAll('.result-marker-label.expanded').forEach(l => l.classList.remove('expanded'));
     if (justClosedPopup) return;
     if (anyDropdownOpen()) {
         closeAllDropdowns();
@@ -1810,11 +1885,53 @@ map.on('click', function (e) {
     placePin(e.latlng.lat, e.latlng.lng);
 });
 
-// Pin instruction overlay
+// Pin instruction overlay (initial state — centered pill with icon)
 var pinInstruction = document.createElement('div');
 pinInstruction.id = 'pin-instruction';
-pinInstruction.textContent = isTouch ? 'Tap to drop a pin' : 'Click to drop a pin';
+pinInstruction.innerHTML = '<span class="material-symbols-outlined">adjust</span>' +
+    (isTouch ? 'tap to drop a pin' : 'click to drop a pin');
 document.getElementById('map').appendChild(pinInstruction);
+
+// Cursor label — follows mouse on desktop (shows "drop" or "drag")
+var cursorLabel = document.createElement('div');
+cursorLabel.id = 'cursor-label';
+document.body.appendChild(cursorLabel);
+
+if (!isTouch) {
+    var cursorLabelState = ''; // 'drop' | 'drag' | ''
+    var hoveringPin = false;
+
+    function setCursorLabel(state) {
+        if (state === cursorLabelState) return;
+        cursorLabelState = state;
+        if (state === 'drop') {
+            cursorLabel.innerHTML = '<span class="material-symbols-outlined">location_on</span>drop';
+            cursorLabel.classList.add('visible');
+        } else if (state === 'drag') {
+            cursorLabel.innerHTML = '<span class="material-symbols-outlined">drag_pan</span>drag';
+            cursorLabel.classList.add('visible');
+        } else if (state === 'details') {
+            cursorLabel.innerHTML = '<span class="material-symbols-outlined">info</span>details';
+            cursorLabel.classList.add('visible');
+        } else {
+            cursorLabel.classList.remove('visible');
+        }
+    }
+
+    document.getElementById('map').addEventListener('mousemove', function(e) {
+        cursorLabel.style.left = (e.clientX + 16) + 'px';
+        cursorLabel.style.top = (e.clientY + 16) + 'px';
+        if (hoveringPin) return; // state managed by marker mouseover/mouseout
+        var overMap = e.target.closest('#map') && !e.target.closest('.leaflet-popup') &&
+                      !e.target.closest('.leaflet-control') && !e.target.closest('.pin-dot');
+        setCursorLabel(overMap ? 'drop' : '');
+    });
+
+    document.getElementById('map').addEventListener('mouseleave', function() {
+        setCursorLabel('');
+        hoveringPin = false;
+    });
+}
 
 // Read URL hash or fall back to geolocation
 var hashState = readUrlHash();

@@ -13,8 +13,7 @@ class GooglePlacesProvider implements ProviderInterface
     private const FIELD_MASK = 'places.displayName,places.formattedAddress,places.location,'
         . 'places.rating,places.priceLevel,places.types,places.photos,'
         . 'places.nationalPhoneNumber,places.websiteUri,places.regularOpeningHours,'
-        . 'places.userRatingCount,places.id,'
-        . 'places.dineIn,places.takeout,places.delivery';
+        . 'places.userRatingCount,places.id';
 
     private const PRICE_LEVEL_MAP = [
         'PRICE_LEVEL_FREE'           => 0,
@@ -113,6 +112,7 @@ class GooglePlacesProvider implements ProviderInterface
     private function normalizePlace(array $place): array
     {
         $openNow = $place['regularOpeningHours']['openNow'] ?? null;
+        $periods = $place['regularOpeningHours']['periods'] ?? [];
 
         return [
             'name'         => $place['displayName']['text'] ?? '',
@@ -129,12 +129,8 @@ class GooglePlacesProvider implements ProviderInterface
             'source_id'    => $place['id'] ?? '',
             'distance'     => 0.0,
             'review_count' => (int) ($place['userRatingCount'] ?? 0),
-            'transactions' => array_values(array_filter([
-                ($place['dineIn'] ?? false) ? 'dine_in' : null,
-                ($place['takeout'] ?? false) ? 'takeout' : null,
-                ($place['delivery'] ?? false) ? 'delivery' : null,
-            ])),
             'is_closed'    => $openNow === null ? false : !$openNow,
+            'opening_periods' => $periods,
         ];
     }
 }

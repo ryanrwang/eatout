@@ -1,6 +1,7 @@
 // State
 let currentMarker = null;
 let currentCircle = null;
+let hasSearchedOnce = false;
 let radarMarker = null;
 let pinSearchPopup = null;
 let selectedRadius = 500;
@@ -19,130 +20,129 @@ let debugMode = localStorage.getItem('eatout_debug') === '1';
 let bottomSheetState = 'hidden';
 const isTouch = ('ontouchstart' in window) || window.matchMedia('(pointer: coarse)').matches;
 
-// Mock data for debug mode
-const MOCK_RESULTS = [
-    {
-        name: "Pai Northern Thai Kitchen", address: "18 Duncan St, Toronto, ON M5H 3G8",
-        latitude: 43.6495, longitude: -79.3882, rating: 4.5, price_level: 2,
-        cuisine_tags: ["thai_restaurant", "restaurant", "food"],
-        image_url: "", phone: "(416) 901-4724", source: "google",
-        source_url: "https://www.google.com/maps/place/?q=place_id:ChIJDbmGBaY0K4gRSTkwBKFSDgM",
-        source_id: "ChIJDbmGBaY0K4gRSTkwBKFSDgM", distance: 0.0,
-        review_count: 4812, is_closed: false
-    },
-    {
-        name: "Kinka Izakaya Original", address: "398 Church St, Toronto, ON M5B 2A2",
-        latitude: 43.6598, longitude: -79.3790, rating: 4.3, price_level: 2,
-        cuisine_tags: ["japanese_restaurant", "sushi_restaurant", "restaurant"],
-        image_url: "", phone: "(416) 977-0999", source: "google",
-        source_url: "https://www.google.com/maps/place/?q=place_id:ChIJTSRBqKc0K4gRkH1MlUKJOGE",
-        source_id: "ChIJTSRBqKc0K4gRkH1MlUKJOGE", distance: 0.0,
-        review_count: 3241, is_closed: false
-    },
-    {
-        name: "Richmond Station", address: "1 Richmond St W, Toronto, ON M5H 3W4",
-        latitude: 43.6512, longitude: -79.3810, rating: 4.4, price_level: 3,
-        cuisine_tags: ["restaurant", "brunch_restaurant", "cafe"],
-        image_url: "", phone: "(647) 748-1444", source: "google",
-        source_url: "https://www.google.com/maps/place/?q=place_id:ChIJm8Oc3qU0K4gRpkOXSGKTMhQ",
-        source_id: "ChIJm8Oc3qU0K4gRpkOXSGKTMhQ", distance: 0.0,
-        review_count: 1823, is_closed: true
-    },
-    {
-        name: "Byblos Toronto", address: "11 Duncan St, Toronto, ON M5H 3G8",
-        latitude: 43.6490, longitude: -79.3878, rating: 4.6, price_level: 4,
-        cuisine_tags: ["mediterranean_restaurant", "restaurant"],
-        image_url: "", phone: "(416) 637-7575", source: "google",
-        source_url: "https://www.google.com/maps/place/?q=place_id:ChIJY7aDzaY0K4gRQ0K1fXn5n4o",
-        source_id: "ChIJY7aDzaY0K4gRQ0K1fXn5n4o", distance: 0.0,
-        review_count: 2456, is_closed: false
-    },
-    {
-        name: "Sansotei Ramen", address: "179 Dundas St W, Toronto, ON M5G 1C7",
-        latitude: 43.6543, longitude: -79.3865, rating: 4.2, price_level: 1,
-        cuisine_tags: ["ramen_restaurant", "japanese_restaurant"],
-        image_url: "", phone: "(647) 748-3833", source: "google",
-        source_url: "https://www.google.com/maps/place/?q=place_id:ChIJ8xWPxqU0K4gR3S4DF9YIDQ0",
-        source_id: "ChIJ8xWPxqU0K4gR3S4DF9YIDQ0", distance: 0.0,
-        review_count: 987, is_closed: false
-    }
+// Mock data generator for debug mode
+// Mock restaurant data — each entry has deterministic cuisine, price, and hours
+const MOCK_RESTAURANTS = [
+    { name: "Pai Northern Thai Kitchen", cuisine: ["thai_restaurant", "restaurant"], price: 2, openHour: 11.5, closeHour: 22, closedDays: [1] },
+    { name: "Kinka Izakaya", cuisine: ["japanese_restaurant", "sushi_restaurant"], price: 2, openHour: 17, closeHour: 23, closedDays: [] },
+    { name: "Richmond Station", cuisine: ["restaurant", "brunch_restaurant", "cafe"], price: 3, openHour: 11, closeHour: 22, closedDays: [0] },
+    { name: "Byblos", cuisine: ["mediterranean_restaurant", "restaurant"], price: 3, openHour: 17, closeHour: 23, closedDays: [1] },
+    { name: "Sansotei Ramen", cuisine: ["ramen_restaurant", "japanese_restaurant"], price: 1, openHour: 11, closeHour: 21, closedDays: [] },
+    { name: "Lee Restaurant", cuisine: ["chinese_restaurant", "restaurant"], price: 3, openHour: 17, closeHour: 23, closedDays: [0, 1] },
+    { name: "Canoe", cuisine: ["restaurant", "french_restaurant"], price: 4, openHour: 11.5, closeHour: 22, closedDays: [0] },
+    { name: "Alo", cuisine: ["french_restaurant", "restaurant"], price: 4, openHour: 17, closeHour: 23, closedDays: [0, 1] },
+    { name: "Momofuku Noodle Bar", cuisine: ["korean_restaurant", "restaurant"], price: 2, openHour: 11, closeHour: 22, closedDays: [] },
+    { name: "Gusto 101", cuisine: ["italian_restaurant", "restaurant"], price: 2, openHour: 11, closeHour: 23, closedDays: [] },
+    { name: "Bar Isabel", cuisine: ["mediterranean_restaurant", "restaurant"], price: 3, openHour: 17, closeHour: 1, closedDays: [0] },
+    { name: "Alobar Yorkville", cuisine: ["french_restaurant", "restaurant"], price: 3, openHour: 11, closeHour: 22, closedDays: [1] },
+    { name: "DaiLo", cuisine: ["chinese_restaurant", "restaurant"], price: 3, openHour: 17, closeHour: 22, closedDays: [0, 1] },
+    { name: "Canis", cuisine: ["french_restaurant", "restaurant"], price: 4, openHour: 17.5, closeHour: 22, closedDays: [0, 1] },
+    { name: "Baro", cuisine: ["mexican_restaurant", "restaurant"], price: 2, openHour: 17, closeHour: 23, closedDays: [0] },
+    { name: "Planta", cuisine: ["vegan_restaurant", "restaurant"], price: 3, openHour: 11, closeHour: 22, closedDays: [] },
+    { name: "Miku Toronto", cuisine: ["japanese_restaurant", "sushi_restaurant", "seafood_restaurant"], price: 4, openHour: 11.5, closeHour: 22, closedDays: [] },
+    { name: "KASA Moto", cuisine: ["japanese_restaurant", "sushi_restaurant"], price: 4, openHour: 17, closeHour: 23, closedDays: [1] },
+    { name: "Scaramouche", cuisine: ["french_restaurant", "italian_restaurant"], price: 4, openHour: 17, closeHour: 22, closedDays: [0, 1] },
+    { name: "Enoteca Sociale", cuisine: ["italian_restaurant", "pizza_restaurant"], price: 2, openHour: 17, closeHour: 22, closedDays: [0] },
+    { name: "La Banane", cuisine: ["french_restaurant", "restaurant"], price: 4, openHour: 17.5, closeHour: 23, closedDays: [0, 1] },
+    { name: "Grey Gardens", cuisine: ["restaurant", "cafe"], price: 3, openHour: 11, closeHour: 22, closedDays: [1] },
+    { name: "Banjara Indian", cuisine: ["indian_restaurant", "restaurant"], price: 1, openHour: 11, closeHour: 23, closedDays: [] },
+    { name: "Sukhothai", cuisine: ["thai_restaurant", "restaurant"], price: 1, openHour: 11, closeHour: 21.5, closedDays: [] },
+    { name: "Khao San Road", cuisine: ["thai_restaurant", "restaurant"], price: 1, openHour: 11, closeHour: 22, closedDays: [] },
+    { name: "Pizza Libretto", cuisine: ["pizza_restaurant", "italian_restaurant"], price: 2, openHour: 11, closeHour: 23, closedDays: [] },
+    { name: "Holy Chuck", cuisine: ["hamburger_restaurant", "restaurant"], price: 1, openHour: 11, closeHour: 22, closedDays: [] },
+    { name: "Dandylion", cuisine: ["breakfast_restaurant", "cafe"], price: 2, openHour: 8, closeHour: 15, closedDays: [0, 1] },
+    { name: "Pho Tien Thanh", cuisine: ["vietnamese_restaurant", "restaurant"], price: 1, openHour: 11, closeHour: 21, closedDays: [1] },
+    { name: "Beach Hill Smokehouse", cuisine: ["barbecue_restaurant", "restaurant"], price: 2, openHour: 11.5, closeHour: 21, closedDays: [0, 1] },
+    { name: "Bang Bang Ice Cream", cuisine: ["dessert_restaurant", "cafe"], price: 1, openHour: 12, closeHour: 22, closedDays: [] },
+    { name: "Campechano", cuisine: ["mexican_restaurant", "restaurant"], price: 1, openHour: 12, closeHour: 21, closedDays: [0] },
+    { name: "Rodney's Oyster House", cuisine: ["seafood_restaurant", "restaurant"], price: 3, openHour: 11, closeHour: 22, closedDays: [0] },
+    { name: "Tabule", cuisine: ["mediterranean_restaurant", "restaurant"], price: 2, openHour: 11, closeHour: 22, closedDays: [] },
+    { name: "Korea House", cuisine: ["korean_restaurant", "restaurant"], price: 1, openHour: 11, closeHour: 22, closedDays: [] },
 ];
+const MOCK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-const MOCK_DETAILS = {
-    "ChIJDbmGBaY0K4gRSTkwBKFSDgM": {
-        photos: [
-            { name: "places/ChIJDbmGBaY0K4gRSTkwBKFSDgM/photos/AelY_Ct1a2bK", widthPx: 400, heightPx: 300 },
-            { name: "places/ChIJDbmGBaY0K4gRSTkwBKFSDgM/photos/AelY_Ct2x9qR", widthPx: 400, heightPx: 300 },
-            { name: "places/ChIJDbmGBaY0K4gRSTkwBKFSDgM/photos/AelY_Ct3m7nP", widthPx: 400, heightPx: 300 }
-        ],
-        hours: [
-            { day: "Monday", open: "11:30 AM", close: "10:00 PM" },
-            { day: "Tuesday", open: "11:30 AM", close: "10:00 PM" },
-            { day: "Wednesday", open: "11:30 AM", close: "10:00 PM" },
-            { day: "Thursday", open: "11:30 AM", close: "10:00 PM" },
-            { day: "Friday", open: "11:30 AM", close: "11:00 PM" },
-            { day: "Saturday", open: "11:00 AM", close: "11:00 PM" },
-            { day: "Sunday", open: "11:00 AM", close: "10:00 PM" }
-        ],
-        phone: "(416) 901-4724", address: "18 Duncan St, Toronto, ON M5H 3G8",
-        website: "https://www.paitoronto.com"
-    },
-    "ChIJTSRBqKc0K4gRkH1MlUKJOGE": {
-        photos: [
-            { name: "places/ChIJTSRBqKc0K4gRkH1MlUKJOGE/photos/AelY_DkR4wZ", widthPx: 400, heightPx: 300 }
-        ],
-        hours: [
-            { day: "Monday", open: "5:00 PM", close: "11:00 PM" },
-            { day: "Tuesday", open: "5:00 PM", close: "11:00 PM" },
-            { day: "Wednesday", open: "5:00 PM", close: "11:00 PM" },
-            { day: "Thursday", open: "5:00 PM", close: "11:00 PM" },
-            { day: "Friday", open: "5:00 PM", close: "12:00 AM" },
-            { day: "Saturday", open: "12:00 PM", close: "12:00 AM" },
-            { day: "Sunday", open: "12:00 PM", close: "10:00 PM" }
-        ],
-        phone: "(416) 977-0999", address: "398 Church St, Toronto, ON M5B 2A2",
-        website: "https://www.kinkaizakaya.com"
-    },
-    "ChIJm8Oc3qU0K4gRpkOXSGKTMhQ": {
-        photos: [],
-        hours: [],
-        phone: "(647) 748-1444", address: "1 Richmond St W, Toronto, ON M5H 3W4",
-        website: "https://www.richmondstation.ca"
-    },
-    "ChIJY7aDzaY0K4gRQ0K1fXn5n4o": {
-        photos: [
-            { name: "places/ChIJY7aDzaY0K4gRQ0K1fXn5n4o/photos/AelY_Bx8pQm", widthPx: 400, heightPx: 300 },
-            { name: "places/ChIJY7aDzaY0K4gRQ0K1fXn5n4o/photos/AelY_Ck3rTn", widthPx: 400, heightPx: 300 }
-        ],
-        hours: [
-            { day: "Monday", open: "5:00 PM", close: "10:00 PM" },
-            { day: "Tuesday", open: "5:00 PM", close: "10:00 PM" },
-            { day: "Wednesday", open: "5:00 PM", close: "10:00 PM" },
-            { day: "Thursday", open: "5:00 PM", close: "10:00 PM" },
-            { day: "Friday", open: "5:00 PM", close: "11:00 PM" },
-            { day: "Saturday", open: "11:00 AM", close: "11:00 PM" },
-            { day: "Sunday", open: "11:00 AM", close: "10:00 PM" }
-        ],
-        phone: "(416) 637-7575", address: "11 Duncan St, Toronto, ON M5H 3G8",
-        website: "https://www.byblos.com"
-    },
-    "ChIJ8xWPxqU0K4gR3S4DF9YIDQ0": {
-        photos: [
-            { name: "places/ChIJ8xWPxqU0K4gR3S4DF9YIDQ0/photos/AelY_Fm2kLp", widthPx: 400, heightPx: 300 }
-        ],
-        hours: [
-            { day: "Monday", open: "11:00 AM", close: "9:00 PM" },
-            { day: "Tuesday", open: "11:00 AM", close: "9:00 PM" },
-            { day: "Wednesday", open: "11:00 AM", close: "9:00 PM" },
-            { day: "Thursday", open: "11:00 AM", close: "9:00 PM" },
-            { day: "Friday", open: "11:00 AM", close: "9:30 PM" },
-            { day: "Saturday", open: "11:00 AM", close: "9:30 PM" },
-            { day: "Sunday", open: "11:00 AM", close: "9:00 PM" }
-        ],
-        phone: "(647) 748-3833", address: "179 Dundas St W, Toronto, ON M5G 1C7",
-        website: null
+function generateMockResults(lat, lng, radiusMeters, count) {
+    var radiusDeg = radiusMeters / 111000;
+    var results = [];
+    // Shuffle indices to pick random subset
+    var indices = MOCK_RESTAURANTS.map(function(_, i) { return i; });
+    for (var s = indices.length - 1; s > 0; s--) {
+        var j = Math.floor(Math.random() * (s + 1));
+        var tmp = indices[s]; indices[s] = indices[j]; indices[j] = tmp;
     }
-};
+    var picked = indices.slice(0, Math.min(count, MOCK_RESTAURANTS.length));
+    for (var i = 0; i < picked.length; i++) {
+        var mock = MOCK_RESTAURANTS[picked[i]];
+        var angle = Math.random() * 2 * Math.PI;
+        var dist = Math.sqrt(Math.random()) * radiusDeg;
+        var rLat = lat + dist * Math.cos(angle);
+        var rLng = lng + dist * Math.sin(angle) / Math.cos(lat * Math.PI / 180);
+        var mockId = 'mock_' + Date.now().toString(36) + '_' + i;
+        // Compute is_closed based on current time
+        var now = new Date();
+        var dayOfWeek = now.getDay(); // 0=Sun
+        var currentHour = now.getHours() + now.getMinutes() / 60;
+        var isClosed = mock.closedDays.indexOf(dayOfWeek) !== -1;
+        if (!isClosed) {
+            if (mock.closeHour > mock.openHour) {
+                isClosed = currentHour < mock.openHour || currentHour >= mock.closeHour;
+            } else {
+                // Wraps past midnight (e.g. open 17, close 1)
+                isClosed = currentHour >= mock.closeHour && currentHour < mock.openHour;
+            }
+        }
+        results.push({
+            name: mock.name,
+            address: Math.floor(Math.random() * 500 + 1) + " Mock St, Toronto, ON",
+            latitude: rLat, longitude: rLng,
+            rating: +(3.0 + Math.random() * 2).toFixed(1),
+            price_level: mock.price,
+            cuisine_tags: mock.cuisine,
+            image_url: "", phone: "(416) " + (100 + Math.floor(Math.random() * 900)) + "-" + (1000 + Math.floor(Math.random() * 9000)),
+            source: "google",
+            source_url: "https://www.google.com/maps/place/?q=place_id:" + mockId,
+            source_id: mockId, distance: 0.0,
+            review_count: Math.floor(Math.random() * 5000) + 50,
+            is_closed: isClosed,
+            _openHour: mock.openHour,
+            _closeHour: mock.closeHour,
+            _closedDays: mock.closedDays
+        });
+    }
+    return results;
+}
+
+function generateMockDetails(sourceId) {
+    // Find the matching mock restaurant from searchResults to use its real hours
+    var match = searchResults.find(function(r) { return r.source_id === sourceId; });
+    var openH = match && match._openHour != null ? match._openHour : 11;
+    var closeH = match && match._closeHour != null ? match._closeHour : 22;
+    var closedDays = match && match._closedDays ? match._closedDays : [];
+    function formatHour(h) {
+        var hour = Math.floor(h);
+        var min = Math.round((h - hour) * 60);
+        var ampm = hour >= 12 ? 'PM' : 'AM';
+        var h12 = hour % 12 || 12;
+        return h12 + ':' + (min < 10 ? '0' : '') + min + ' ' + ampm;
+    }
+    var photoCount = Math.floor(Math.random() * 4);
+    var photos = [];
+    for (var p = 0; p < photoCount; p++) {
+        photos.push({ name: "places/" + sourceId + "/photos/mock_" + p, widthPx: 400, heightPx: 300 });
+    }
+    return {
+        photos: photos,
+        hours: MOCK_DAYS.map(function(d, i) {
+            // i: 0=Mon, map to JS day: Mon=1, Tue=2, ...Sun=0
+            var jsDay = (i + 1) % 7;
+            if (closedDays.indexOf(jsDay) !== -1) return { day: d, open: 'Closed', close: '' };
+            return { day: d, open: formatHour(openH), close: formatHour(closeH) };
+        }),
+        phone: "(416) " + (100 + Math.floor(Math.random() * 900)) + "-" + (1000 + Math.floor(Math.random() * 9000)),
+        address: match ? match.address : Math.floor(Math.random() * 500 + 1) + " Mock St, Toronto, ON",
+        website: Math.random() > 0.3 ? "https://www.example.com" : null
+    };
+}
 
 // Update API counter display
 function updateApiCounter() {
@@ -261,18 +261,69 @@ function updateCuisineToggle() {
 // Filter persistence (sessionStorage)
 function saveFiltersToSession() {
     var cuisines = Array.from(cuisineDropdown.querySelectorAll('input:checked')).map(function(cb) { return cb.value; });
-    var priceRange = window._getPriceRange ? window._getPriceRange() : { min: 1, max: 4 };
+    var activePrices = window._getActivePrices ? window._getActivePrices() : [];
     var sort = document.getElementById('filter-sort').value;
     var date = document.getElementById('filter-date').value;
     var time = document.getElementById('filter-time').value;
     sessionStorage.setItem('eatout_filters', JSON.stringify({
-        cuisines: cuisines, priceRange: priceRange, sort: sort, date: date, time: time, radius: selectedRadius
+        cuisines: cuisines, activePrices: activePrices, sort: sort, date: date, time: time, radius: selectedRadius
     }));
     // Show search button if results are stale due to filter change
     if (searchResults.length > 0 && pinLat !== null && !pinSearchPopup) {
         showPinSearchPopup(pinLat, pinLng);
     }
+    updateResetButton();
 }
+
+// Reset all filters
+function hasActiveFilters() {
+    var cuisines = cuisineDropdown.querySelectorAll('input:checked').length > 0;
+    var prices = window._getActivePrices ? window._getActivePrices().length > 0 && window._getActivePrices().length < 4 : false;
+    var date = document.getElementById('filter-date').value !== '';
+    var time = document.getElementById('filter-time').value !== '';
+    var radius = selectedRadius !== 500;
+    return cuisines || prices || date || time || radius;
+}
+
+function updateResetButton() {
+    var btn = document.getElementById('filter-reset');
+    if (!btn) return;
+    btn.classList.toggle('active', hasActiveFilters());
+}
+
+function resetAllFilters() {
+    // Clear cuisines
+    cuisineDropdown.querySelectorAll('input:checked').forEach(function(cb) { cb.checked = false; });
+    updateCuisineToggle();
+
+    // Clear prices
+    var dd = document.getElementById('price-dropdown');
+    dd.querySelectorAll('input[type="checkbox"]').forEach(function(cb) { cb.checked = false; });
+    if (window._updatePriceToggle) window._updatePriceToggle();
+
+    // Clear date
+    document.getElementById('filter-date').value = '';
+    updateDateToggle();
+
+    // Clear time
+    document.getElementById('filter-time').value = '';
+    if (window._syncTimeDisplay) window._syncTimeDisplay();
+
+    // Reset radius to default
+    setRadius(500);
+
+    saveFiltersToSession();
+    updateResetButton();
+}
+
+(function() {
+    var btn = document.getElementById('filter-reset');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+        if (!hasActiveFilters()) return;
+        resetAllFilters();
+    });
+})();
 
 function restoreFiltersFromSession() {
     var saved = sessionStorage.getItem('eatout_filters');
@@ -285,8 +336,17 @@ function restoreFiltersFromSession() {
             });
             updateCuisineToggle();
         }
-        if (f.priceRange && window._setPriceRange) {
-            window._setPriceRange(f.priceRange.min, f.priceRange.max);
+        if (f.activePrices) {
+            var dd = document.getElementById('price-dropdown');
+            dd.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+                cb.checked = f.activePrices.indexOf(parseInt(cb.value)) !== -1;
+            });
+            if (window._updatePriceToggle) window._updatePriceToggle();
+        } else if (f.priceRange && window._setPriceRange) {
+            // Legacy format: only restore if not the default 1-4 range
+            if (f.priceRange.min !== 1 || f.priceRange.max !== 4) {
+                window._setPriceRange(f.priceRange.min, f.priceRange.max);
+            }
         }
         if (f.sort) document.getElementById('filter-sort').value = f.sort;
         if (f.date) {
@@ -410,6 +470,7 @@ document.addEventListener('click', function(e) {
     updateToggle();
 
     window._getActivePrices = getActivePrices;
+    window._updatePriceToggle = updateToggle;
     window._getPriceRange = function() {
         var active = getActivePrices();
         if (!active.length) return { min: 1, max: 4 };
@@ -688,6 +749,7 @@ updateDateToggle();
 
 // Restore filters from session (overrides defaults if saved)
 restoreFiltersFromSession();
+updateResetButton();
 
 // Filter change handlers for persistence
 document.getElementById('filter-sort').addEventListener('change', function() {
@@ -813,9 +875,10 @@ function updatePanelTop() {
     var panel = document.getElementById('results-panel');
     if (panel.style.display === 'none' || isMobile()) return;
     var filterBar = document.getElementById('filter-bar');
-    var filterRect = filterBar.getBoundingClientRect();
-    var panelRight = 12 + 360; // left + width
-    if (filterRect.left >= panelRight) {
+    // Use offsetWidth (unaffected by transforms/animations) to compute true left edge
+    var filterLeft = (window.innerWidth - filterBar.offsetWidth) / 2;
+    var panelRight = 12 + 360 + 4; // left + width + gap
+    if (filterLeft >= panelRight) {
         panel.style.top = '12px';
     } else {
         panel.style.top = (12 + filterBar.offsetHeight + 8) + 'px';
@@ -873,9 +936,9 @@ function showResultsPanel() {
 
     // Position: at top when filter bar doesn't overlap, else below it
     var filterBar = document.getElementById('filter-bar');
-    var filterRect = filterBar.getBoundingClientRect();
-    var panelRight = 12 + 360;
-    if (filterRect.left >= panelRight) {
+    var filterLeft = (window.innerWidth - filterBar.offsetWidth) / 2;
+    var panelRight = 12 + 360 + 4;
+    if (filterLeft >= panelRight) {
         panel.style.top = '12px';
     } else {
         panel.style.top = (12 + filterBar.offsetHeight + 8) + 'px';
@@ -964,9 +1027,9 @@ function scrollToCard(index) {
 
 // Fetch place details
 async function fetchDetails(sourceId) {
-    if (debugMode && MOCK_DETAILS[sourceId]) {
+    if (debugMode && sourceId.startsWith('mock_')) {
         await new Promise(r => setTimeout(r, 300 + Math.random() * 400));
-        return MOCK_DETAILS[sourceId];
+        return generateMockDetails(sourceId);
     }
     const resp = await fetch('api/details.php?place_id=' + encodeURIComponent(sourceId));
     const data = await resp.json();
@@ -1266,6 +1329,100 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
+// Check if a restaurant is open at a given day/hour using Google opening_periods
+// periods: [{open:{day,hour,minute}, close:{day,hour,minute}}, ...]
+// day: 0=Sun (matches JS getDay()), hour: 0-23, minute: 0-59
+function isOpenAtTime(periods, queryDay, queryHour, queryMinute) {
+    if (!periods || periods.length === 0) return null; // unknown
+    // 24/7: single period with open day=0,hour=0,minute=0 and no close
+    if (periods.length === 1 && !periods[0].close) return true;
+    var queryMins = queryDay * 1440 + queryHour * 60 + queryMinute;
+    for (var i = 0; i < periods.length; i++) {
+        var p = periods[i];
+        if (!p.open) continue;
+        var openMins = p.open.day * 1440 + p.open.hour * 60 + (p.open.minute || 0);
+        if (!p.close) continue; // skip malformed
+        var closeMins = p.close.day * 1440 + p.close.hour * 60 + (p.close.minute || 0);
+        if (closeMins <= openMins) closeMins += 7 * 1440; // wraps week
+        var qm = queryMins;
+        // Check both this week position and +7days (for wrap-around periods)
+        if ((qm >= openMins && qm < closeMins) || (qm + 7 * 1440 >= openMins && qm + 7 * 1440 < closeMins)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Client-side filter: price level, cuisine, and open/closed
+function filterResults(results) {
+    var activePrices = window._getActivePrices ? window._getActivePrices() : [];
+    var selectedCuisines = Array.from(cuisineDropdown.querySelectorAll('input:checked')).map(function(cb) { return cb.value; });
+    var dateVal = document.getElementById('filter-date').value;
+    var timeVal = document.getElementById('filter-time').value;
+
+    // Determine query day/time for open filtering
+    var hasDateTimeFilter = dateVal || timeVal;
+    var queryDay = null, queryHour = null, queryMinute = null;
+    if (hasDateTimeFilter) {
+        var queryDate;
+        if (dateVal && timeVal) {
+            queryDate = new Date(dateVal + 'T' + timeVal);
+        } else if (dateVal) {
+            // Date only — use current time on that date
+            var now = new Date();
+            queryDate = new Date(dateVal + 'T' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0'));
+        } else {
+            // Time only — use today's date at that time
+            var now = new Date();
+            var todayISO = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+            queryDate = new Date(todayISO + 'T' + timeVal);
+        }
+        queryDay = queryDate.getDay(); // 0=Sun
+        queryHour = queryDate.getHours();
+        queryMinute = queryDate.getMinutes();
+    }
+
+    return results.filter(function(r) {
+        // Price filter (activePrices may be numbers or strings)
+        if (activePrices.length > 0 && activePrices.length < 4) {
+            if (!r.price_level || activePrices.indexOf(Number(r.price_level)) === -1 && activePrices.indexOf(String(r.price_level)) === -1) return false;
+        }
+
+        // Cuisine filter (for mock data — API already filters, but this ensures consistency)
+        if (selectedCuisines.length > 0) {
+            var tags = r.cuisine_tags || [];
+            var hasMatch = selectedCuisines.some(function(c) { return tags.indexOf(c) !== -1; });
+            if (!hasMatch) return false;
+        }
+
+        // Date/time open filter
+        if (hasDateTimeFilter && queryDay !== null) {
+            // Mock data with embedded schedule
+            if (r._closedDays != null && r._openHour != null && r._closeHour != null) {
+                if (r._closedDays.indexOf(queryDay) !== -1) return false;
+                var qh = queryHour + queryMinute / 60;
+                if (r._closeHour > r._openHour) {
+                    if (qh < r._openHour || qh >= r._closeHour) return false;
+                } else {
+                    if (qh >= r._closeHour && qh < r._openHour) return false;
+                }
+            }
+            // API results with opening_periods (Google regularOpeningHours.periods)
+            else if (r.opening_periods && r.opening_periods.length > 0) {
+                var open = isOpenAtTime(r.opening_periods, queryDay, queryHour, queryMinute);
+                if (open === false) return false;
+                // open === null means unknown hours — keep the result
+            }
+            // Fallback: use is_closed flag (only reliable for "right now")
+            else if (r.is_closed) {
+                return false;
+            }
+        }
+
+        return true;
+    });
+}
+
 // Perform search
 async function performSearch() {
     if (pinLat === null || isSearching) return;
@@ -1279,21 +1436,42 @@ async function performSearch() {
         pinSearchPopup = null;
     }
 
+    // On first search, zoom to fit the radius circle (~50% of visible area)
+    if (!hasSearchedOnce && currentCircle) {
+        hasSearchedOnce = true;
+        // Create bounds at 2x the radius so the circle covers ~50% of the view
+        var center = currentCircle.getLatLng();
+        var doubleRadius = selectedRadius * 2;
+        var earthRadius = 6371000;
+        var dLat = (doubleRadius / earthRadius) * (180 / Math.PI);
+        var dLng = (doubleRadius / (earthRadius * Math.cos(center.lat * Math.PI / 180))) * (180 / Math.PI);
+        var expandedBounds = L.latLngBounds(
+            [center.lat - dLat, center.lng - dLng],
+            [center.lat + dLat, center.lng + dLng]
+        );
+        var panelPad = isMobile() ? 0 : 384;
+        map.fitBounds(expandedBounds, {
+            paddingTopLeft: [panelPad, 0],
+            paddingBottomRight: [0, 0],
+            animate: true,
+            duration: 0.5,
+            maxZoom: 18
+        });
+    }
+
     // Show skeleton loading
     showSkeletonCards();
     if (!panelOpen) showResultsPanel();
 
-    // Debug mode: use mock data
+    // Debug mode: use generated mock data
     if (debugMode) {
         await new Promise(r => setTimeout(r, 400 + Math.random() * 300));
-        let results = MOCK_RESULTS.map((r, i) => ({
-            ...r,
-            latitude: pinLat + (r.latitude - 43.6532) * 0.5,
-            longitude: pinLng + (r.longitude - (-79.3832)) * 0.5,
-        }));
-        results = results.slice(0, 10);
-        displayResults(results);
-        showNotification('Debug mode: showing mock data', 'info');
+        var results = generateMockResults(pinLat, pinLng, selectedRadius, MOCK_RESTAURANTS.length);
+        results = filterResults(results);
+        if (results.length === 0) {
+            showNotification('No restaurants match your filters. Try broadening your search.', 'warning');
+        }
+        displayResults(results.slice(0, 10));
         isSearching = false;
         updateSearchButtonState();
         return;
@@ -1309,16 +1487,7 @@ async function performSearch() {
 
     const selectedCuisines = Array.from(cuisineDropdown.querySelectorAll('input:checked')).map(cb => cb.value);
     if (selectedCuisines.length > 0) params.set('categories', selectedCuisines.join(','));
-
-    var activePrices = window._getActivePrices ? window._getActivePrices() : [];
-    if (activePrices.length > 0 && activePrices.length < 4) params.set('price', activePrices.join(','));
-
-    const dateVal = document.getElementById('filter-date').value;
-    const timeVal = document.getElementById('filter-time').value;
-    if (dateVal && timeVal) {
-        const ts = Math.floor(new Date(dateVal + 'T' + timeVal).getTime() / 1000);
-        if (ts > 0) params.set('open_at', ts);
-    }
+    // Price, date/time are filtered client-side using opening_periods data
 
     try {
         const resp = await fetch('api/search.php?' + params.toString());
@@ -1328,6 +1497,13 @@ async function performSearch() {
             showNotification(data.message || data.error || 'Search failed (' + resp.status + ')', 'error');
         } else {
             let results = data.results;
+
+            // Client-side filter for price and open/closed (API doesn't support these natively)
+            results = filterResults(results);
+
+            if (results.length === 0) {
+                showNotification('No restaurants match your filters. Try broadening your search.', 'warning');
+            }
 
             // Cap displayed results at 10
             results = results.slice(0, 10);
@@ -1477,14 +1653,15 @@ function showPinSearchPopup(lat, lng) {
     if (pinSearchPopup) {
         map.closePopup(pinSearchPopup);
     }
+    var debugLabel = debugMode ? '<div class="pin-search-debug">(debug)</div>' : '';
     pinSearchPopup = L.popup({
         className: 'pin-search-popup',
         closeButton: false,
-        offset: [0, 85],
+        offset: [0, debugMode ? 105 : 85],
         autoPan: false
     })
     .setLatLng([lat, lng])
-    .setContent('<button class="btn-primary pin-search-btn" onclick="performSearch()">Search</button>')
+    .setContent('<button class="btn-primary pin-search-btn" onclick="performSearch()">Search</button>' + debugLabel)
     .openOn(map);
 }
 
@@ -1788,8 +1965,11 @@ document.addEventListener('keydown', function(e) {
 
         // Start resize bounce observer after swoop-in finishes
         var lastWidth = bar.offsetWidth;
-        var observer = new ResizeObserver(function(entries) {
+        var firstCallback = true;
+        // Store on element to prevent garbage collection
+        bar._resizeObserver = new ResizeObserver(function(entries) {
             var newWidth = entries[0].contentRect.width;
+            if (firstCallback) { firstCallback = false; lastWidth = newWidth; return; }
             if (lastWidth > 0 && Math.abs(newWidth - lastWidth) > 2) {
                 var ratio = lastWidth / newWidth;
                 bar.animate([
@@ -1801,9 +1981,10 @@ document.addEventListener('keydown', function(e) {
                 });
             }
             lastWidth = newWidth;
+            requestAnimationFrame(updatePanelTop);
         });
         // Delay observer start until transition completes
-        setTimeout(function() { observer.observe(bar); }, 700);
+        setTimeout(function() { bar._resizeObserver.observe(bar); }, 700);
     }, 1200);
 })();
 

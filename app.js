@@ -4,6 +4,7 @@ let currentCircle = null;
 let hasSearchedOnce = false;
 let radarMarker = null;
 let pinSearchPopup = null;
+let pinNoResultsPopup = null;
 let selectedRadius = 500;
 let pinLat = null;
 let pinLng = null;
@@ -271,7 +272,7 @@ function saveFiltersToSession() {
         cuisines: cuisines, activePrices: activePrices, sort: sort, date: date, time: time, radius: selectedRadius
     }));
     // Show search button if results are stale due to filter change
-    if (searchResults.length > 0 && pinLat !== null && !pinSearchPopup) {
+    if (hasSearchedOnce && pinLat !== null && !pinSearchPopup) {
         showPinSearchPopup(pinLat, pinLng);
     }
     updateResetButton();
@@ -684,6 +685,7 @@ updateDateToggle();
     var timeToggle = document.getElementById('time-toggle');
     var timeDropdown = document.getElementById('time-dropdown');
     var timeInput = document.getElementById('filter-time');
+    var showingFullList = false;
 
     function formatTime12(h, m) {
         var period = h >= 12 ? 'PM' : 'AM';
@@ -695,22 +697,83 @@ updateDateToggle();
         return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
     }
 
-    // "Any time" option
-    var anySlot = document.createElement('div');
-    anySlot.className = 'time-slot';
-    anySlot.textContent = 'Any time';
-    anySlot.dataset.value = '';
-    timeDropdown.appendChild(anySlot);
+    var presets = [
+        { label: 'Morning', time: '9 AM', value: '09:00' },
+        { label: 'Lunch', time: '12 PM', value: '12:00' },
+        { label: 'Evening', time: '8 PM', value: '20:00' },
+        { label: 'Night', time: '11 PM', value: '23:00' },
+        { label: 'Late', time: '1 AM', value: '01:00' }
+    ];
 
-    // Build single list of time slots
-    for (var h = 0; h < 24; h++) {
-        for (var m = 0; m < 60; m += 30) {
+    function buildPresetView() {
+        timeDropdown.innerHTML = '';
+        showingFullList = false;
+
+        // "Any time" option
+        var anySlot = document.createElement('div');
+        anySlot.className = 'time-slot';
+        anySlot.textContent = 'Any time';
+        anySlot.dataset.value = '';
+        timeDropdown.appendChild(anySlot);
+
+        // Preset options
+        presets.forEach(function(p) {
             var slot = document.createElement('div');
             slot.className = 'time-slot';
-            slot.textContent = formatTime12(h, m);
-            slot.dataset.value = formatTime24(h, m);
+            slot.innerHTML = p.label + ' <span class="time-slot-hint">' + p.time + '</span>';
+            slot.dataset.value = p.value;
             timeDropdown.appendChild(slot);
+        });
+
+        // "Select time" option to switch to full list
+        var selectSlot = document.createElement('div');
+        selectSlot.className = 'time-slot time-slot-select';
+        selectSlot.innerHTML = 'Select time <span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;margin-left:2px">chevron_right</span>';
+        selectSlot.dataset.action = 'expand';
+        timeDropdown.appendChild(selectSlot);
+
+        highlightActive();
+    }
+
+    function buildFullList() {
+        timeDropdown.innerHTML = '';
+        showingFullList = true;
+
+        // Back to presets
+        var backSlot = document.createElement('div');
+        backSlot.className = 'time-slot time-slot-back';
+        backSlot.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;margin-right:2px">chevron_left</span> Back';
+        backSlot.dataset.action = 'collapse';
+        timeDropdown.appendChild(backSlot);
+
+        // Divider
+        var divider = document.createElement('div');
+        divider.className = 'time-slot-divider';
+        timeDropdown.appendChild(divider);
+
+        // Scrollable container for full time list
+        var scrollWrap = document.createElement('div');
+        scrollWrap.className = 'time-dropdown-scroll';
+        for (var h = 0; h < 24; h++) {
+            for (var m = 0; m < 60; m += 30) {
+                var slot = document.createElement('div');
+                slot.className = 'time-slot';
+                slot.textContent = formatTime12(h, m);
+                slot.dataset.value = formatTime24(h, m);
+                scrollWrap.appendChild(slot);
+            }
         }
+        timeDropdown.appendChild(scrollWrap);
+
+        highlightActive();
+    }
+
+    function highlightActive() {
+        var val = timeInput.value;
+        timeDropdown.querySelectorAll('.time-slot').forEach(function(s) {
+            if (s.dataset.action) return;
+            s.classList.toggle('active', s.dataset.value === val);
+        });
     }
 
     function setTimeValue(val24) {
@@ -721,12 +784,13 @@ updateDateToggle();
             timeToggle.classList.remove('filter-active');
         } else {
             var parts = val24.split(':');
-            label.textContent = formatTime12(parseInt(parts[0]), parseInt(parts[1]));
+            var h = parseInt(parts[0]), m = parseInt(parts[1]);
+            // Show preset label if it matches, otherwise show time
+            var preset = presets.find(function(p) { return p.value === val24; });
+            label.textContent = preset ? preset.label : formatTime12(h, m);
             timeToggle.classList.add('filter-active');
         }
-        timeDropdown.querySelectorAll('.time-slot').forEach(function(s) {
-            s.classList.toggle('active', s.dataset.value === val24);
-        });
+        highlightActive();
         saveFiltersToSession();
     }
 
@@ -738,20 +802,46 @@ updateDateToggle();
             timeToggle.classList.remove('filter-active');
         } else {
             var parts = val.split(':');
-            label.textContent = formatTime12(parseInt(parts[0]), parseInt(parts[1]));
+            var h = parseInt(parts[0]), m = parseInt(parts[1]);
+            var preset = presets.find(function(p) { return p.value === val; });
+            label.textContent = preset ? preset.label : formatTime12(h, m);
             timeToggle.classList.add('filter-active');
         }
-        timeDropdown.querySelectorAll('.time-slot').forEach(function(s) {
-            s.classList.toggle('active', s.dataset.value === val);
-        });
+        highlightActive();
     }
+
+    // Build initial preset view
+    buildPresetView();
     syncDisplay();
 
     timeDropdown.addEventListener('click', function(e) {
         var slot = e.target.closest('.time-slot');
         if (!slot) return;
+
+        // Handle expand/collapse actions — stop propagation so document click
+        // handler doesn't close the dropdown (clicked element gets detached by innerHTML='')
+        if (slot.dataset.action === 'expand') {
+            e.stopPropagation();
+            buildFullList();
+            // Scroll to active or 5PM
+            var active = timeDropdown.querySelector('.time-slot.active');
+            if (active && active.dataset.value) {
+                active.scrollIntoView({ block: 'center' });
+            } else {
+                var slot5pm = timeDropdown.querySelector('.time-slot[data-value="17:00"]');
+                if (slot5pm) slot5pm.scrollIntoView({ block: 'center' });
+            }
+            return;
+        }
+        if (slot.dataset.action === 'collapse') {
+            e.stopPropagation();
+            buildPresetView();
+            return;
+        }
+
         setTimeValue(slot.dataset.value);
         timeDropdown.classList.remove('open');
+        if (!showingFullList) buildPresetView(); // Reset to presets on close
         applyFilters();
     });
 
@@ -759,22 +849,19 @@ updateDateToggle();
         e.stopPropagation();
         var wasOpen = timeDropdown.classList.contains('open');
         closeAllDropdowns();
-        if (!wasOpen) timeDropdown.classList.add('open');
-        if (timeDropdown.classList.contains('open')) {
-            var active = timeDropdown.querySelector('.time-slot.active');
-            if (active && active.dataset.value) {
-                active.scrollIntoView({ block: 'center' });
-            } else {
-                // Scroll to 5PM centered when no time selected
-                var slot5pm = timeDropdown.querySelector('.time-slot[data-value="17:00"]');
-                if (slot5pm) slot5pm.scrollIntoView({ block: 'center' });
-            }
+        if (!wasOpen) {
+            // Always open to preset view
+            buildPresetView();
+            timeDropdown.classList.add('open');
         }
     });
 
     document.addEventListener('click', function(e) {
         if (!e.target.closest('.time-wrapper')) {
-            timeDropdown.classList.remove('open');
+            if (timeDropdown.classList.contains('open')) {
+                timeDropdown.classList.remove('open');
+                buildPresetView(); // Reset to presets on close
+            }
         }
     });
 
@@ -1317,10 +1404,14 @@ function displayResults(results) {
     searchResults = results;
 
     if (results.length === 0) {
-        showNotification('No restaurants found in this area.', 'info');
-        if (panelOpen) hideResultsPanel();
+        renderResultCards(results);
+        updatePanelCount();
+        if (!panelOpen) showResultsPanel();
+        if (pinLat !== null) showNoResultsHint(pinLat, pinLng);
         return;
     }
+
+    closeNoResultsHint();
 
     results.forEach((r, i) => {
         const stars = '\u2605'.repeat(Math.round(r.rating || 0));
@@ -1492,11 +1583,12 @@ async function performSearch() {
     isSearching = true;
     updateSearchButtonState();
 
-    // Close pin search popup
+    // Close pin search popup and no-results hint
     if (pinSearchPopup) {
         map.closePopup(pinSearchPopup);
         pinSearchPopup = null;
     }
+    closeNoResultsHint();
 
     // On first search, zoom to fit the radius circle (~50% of visible area)
     if (!hasSearchedOnce && currentCircle) {
@@ -1530,9 +1622,6 @@ async function performSearch() {
         await new Promise(r => setTimeout(r, 400 + Math.random() * 300));
         var results = generateMockResults(pinLat, pinLng, selectedRadius, MOCK_RESTAURANTS.length);
         results = filterResults(results);
-        if (results.length === 0) {
-            showNotification('No restaurants match your filters. Try broadening your search.', 'warning');
-        }
         displayResults(results.slice(0, 10));
         isSearching = false;
         updateSearchButtonState();
@@ -1560,10 +1649,6 @@ async function performSearch() {
 
             // Client-side filter for price and open/closed (API doesn't support these natively)
             results = filterResults(results);
-
-            if (results.length === 0) {
-                showNotification('No restaurants match your filters. Try broadening your search.', 'warning');
-            }
 
             // Cap displayed results at 10
             results = results.slice(0, 10);
@@ -1725,6 +1810,26 @@ function showPinSearchPopup(lat, lng) {
     .openOn(map);
 }
 
+function showNoResultsHint(lat, lng) {
+    closeNoResultsHint();
+    pinNoResultsPopup = L.popup({
+        className: 'pin-no-results-popup',
+        closeButton: false,
+        offset: [0, -8],
+        autoPan: false
+    })
+    .setLatLng([lat, lng])
+    .setContent('<span class="material-symbols-outlined">warning</span> No results')
+    .openOn(map);
+}
+
+function closeNoResultsHint() {
+    if (pinNoResultsPopup) {
+        map.closePopup(pinNoResultsPopup);
+        pinNoResultsPopup = null;
+    }
+}
+
 function placePin(lat, lng) {
     if (currentMarker) {
         map.removeLayer(currentMarker);
@@ -1733,8 +1838,13 @@ function placePin(lat, lng) {
     if (radarMarker) {
         map.removeLayer(radarMarker);
     }
+    var wasFirstPin = pinLat === null;
     pinLat = lat;
     pinLng = lng;
+    // Reset cursor label so it switches from "click to drop a pin" to "drop"
+    if (wasFirstPin && !isTouch && typeof cursorLabelState !== 'undefined') {
+        cursorLabelState = '';
+    }
 
     currentCircle = L.circle([lat, lng], {
         radius: selectedRadius,
@@ -1885,11 +1995,12 @@ map.on('click', function (e) {
     placePin(e.latlng.lat, e.latlng.lng);
 });
 
-// Pin instruction overlay (initial state — centered pill with icon)
+// Pin instruction overlay (initial state — centered pill with icon, mobile only)
 var pinInstruction = document.createElement('div');
 pinInstruction.id = 'pin-instruction';
 pinInstruction.innerHTML = '<span class="material-symbols-outlined">adjust</span>' +
     (isTouch ? 'tap to drop a pin' : 'click to drop a pin');
+if (!isTouch) pinInstruction.style.display = 'none';
 document.getElementById('map').appendChild(pinInstruction);
 
 // Cursor label — follows mouse on desktop (shows "drop" or "drag")
@@ -1905,7 +2016,11 @@ if (!isTouch) {
         if (state === cursorLabelState) return;
         cursorLabelState = state;
         if (state === 'drop') {
-            cursorLabel.innerHTML = '<span class="material-symbols-outlined">location_on</span>drop';
+            if (pinLat === null) {
+                cursorLabel.innerHTML = '<span class="material-symbols-outlined">location_on</span>click to drop a pin';
+            } else {
+                cursorLabel.innerHTML = '<span class="material-symbols-outlined">location_on</span>drop';
+            }
             cursorLabel.classList.add('visible');
         } else if (state === 'drag') {
             cursorLabel.innerHTML = '<span class="material-symbols-outlined">drag_pan</span>drag';
